@@ -14,8 +14,8 @@ export default function ModelTester() {
 	const [outputText, setOutputText] = useState('');
 	const [errorMessage, setErrorMessage] = useState('');
 	const [tokenUsage, setTokenUsage] = useState(null);
-	const [isSavingLocal, setIsSavingLocal] = useState(false);
-	const [saveLocalMessage, setSaveLocalMessage] = useState('');
+	const [isCopying, setIsCopying] = useState(false);
+	const [copyMessage, setCopyMessage] = useState('');
 
 	const isSubmitDisabled = useMemo(() => {
 		return isLoading || userPrompt.trim().length === 0;
@@ -66,39 +66,22 @@ export default function ModelTester() {
 		setOutputText('');
 		setErrorMessage('');
 		setTokenUsage(null);
+		setCopyMessage('');
 	}, []);
 
-	const handleSaveToLocal = useCallback(async () => {
-		setSaveLocalMessage('');
-		setIsSavingLocal(true);
+	const handleCopySystem = useCallback(async () => {
+		setCopyMessage('');
+		setIsCopying(true);
 		try {
-			const response = await fetch('/api/saveLocal', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					label: (label && label.trim()) || deriveLabel(userPrompt),
-					model: selectedModel,
-					system: systemPrompt,
-					prompt: userPrompt,
-					output: outputText,
-					usage: tokenUsage
-				})
-			});
-			const payload = await safeJson(response);
-			if (!response.ok) {
-				throw new Error(payload?.message || `Save failed (${response.status})`);
-			}
-			if (payload?.storage === 'kv') {
-				setSaveLocalMessage(`Saved: KV ${payload.key}`);
-			} else {
-				setSaveLocalMessage(`Saved: ${payload?.filePath || 'local file'}`);
-			}
+			const text = String(systemPrompt || '');
+			await copyToClipboard(text);
+			setCopyMessage('Copied system prompt');
 		} catch (err) {
-			setSaveLocalMessage(err instanceof Error ? err.message : 'Save error');
+			setCopyMessage('Copy failed');
 		} finally {
-			setIsSavingLocal(false);
+			setIsCopying(false);
 		}
-	}, [label, outputText, selectedModel, systemPrompt, tokenUsage, userPrompt]);
+	}, [systemPrompt]);
 
 	return (
 		<div className="container">
@@ -169,16 +152,12 @@ export default function ModelTester() {
 						<button
 							type="button"
 							className="button buttonSecondary"
-							onClick={handleSaveToLocal}
-							disabled={isSavingLocal || !outputText}
-							title="프롬프트/결과를 로컬 파일(JSONL)에 저장"
+							onClick={handleCopySystem}
+							disabled={isCopying || !systemPrompt.trim()}
+							title="시스템 프롬프트 내용을 클립보드로 복사"
 						>
-							{isSavingLocal ? 'Saving…' : '앵간 프롬프트 저장'}
+							{isCopying ? 'Copying…' : '앵간 프롬프트 copy'}
 						</button>
-					</div>
-					<div className="footerNote">
-						Set your API key in <code>.env.local</code>. Required: <code>OPENAI_API_KEY</code>.
-						Optional: <code>OPENAI_BASE_URL</code>.
 					</div>
 				</section>
 			</form>
@@ -197,12 +176,12 @@ export default function ModelTester() {
 						{tokenUsage.total_tokens ?? '—'}
 					</div>
 				)}
-				{saveLocalMessage && (
+				{copyMessage && (
 					<div
 						className="footerNote"
-						style={{ marginTop: 8, color: saveLocalMessage.includes('Saved') ? '#22c55e' : 'var(--danger)' }}
+						style={{ marginTop: 8, color: copyMessage.includes('Copied') ? '#22c55e' : 'var(--danger)' }}
 					>
-						{saveLocalMessage}
+						{copyMessage}
 					</div>
 				)}
 			</section>
@@ -224,6 +203,20 @@ function deriveLabel(text) {
 	// take first line or up to 60 chars
 	const firstLine = t.split(/\r?\n/)[0];
 	return firstLine.length > 60 ? firstLine.slice(0, 57) + '…' : firstLine;
+}
+
+async function copyToClipboard(text) {
+	if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+		await navigator.clipboard.writeText(text);
+		return;
+	}
+	// Fallback for older browsers
+	const el = document.createElement('textarea');
+	el.value = text;
+	document.body.appendChild(el);
+	el.select();
+	document.execCommand('copy');
+	document.body.removeChild(el);
 }
 
 
