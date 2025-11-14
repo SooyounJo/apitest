@@ -332,4 +332,19 @@ a {
 	margin-top: 12px;
 }
 
+.colorRow {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.colorDot {
+	width: 24px;
+	height: 24px;
+	border-radius: 999px;
+	border: 1px solid var(--border);
+	box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.2) inset;
+}
+
 

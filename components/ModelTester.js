@@ -206,6 +206,7 @@ export default function ModelTester() {
 	const [copyMessage, setCopyMessage] = useState('');
 	const [statusMessage, setStatusMessage] = useState('');
 	const [isPresetExpanded, setIsPresetExpanded] = useState(false);
+	const [colorHex, setColorHex] = useState('');
 
 	// No user-edited presets; fixed set only
 
@@ -218,6 +219,7 @@ export default function ModelTester() {
 		setErrorMessage('');
 		setIsLoading(true);
 		setOutputText('');
+		setColorHex('');
 		try {
 			const response = await fetch('/api/generate', {
 				method: 'POST',
@@ -239,6 +241,8 @@ export default function ModelTester() {
 			const result = await response.json();
 			setOutputText(result.output || '');
 			setTokenUsage(result.usage || null);
+			const hx = extractHexFromText(result.output || '');
+			if (hx) setColorHex(hx);
 		} catch (err) {
 			setErrorMessage(
 				err instanceof Error ? err.message : 'Unexpected error occurred'
@@ -311,6 +315,7 @@ export default function ModelTester() {
 		setErrorMessage('');
 		setTokenUsage(null);
 		setCopyMessage('');
+		setColorHex('');
 	}, []);
 
 	return (
@@ -422,6 +427,12 @@ export default function ModelTester() {
 							{tokenUsage.total_tokens ?? '—'}
 						</div>
 					)}
+					{colorHex && (
+						<div className="colorRow">
+							<span className="colorDot" style={{ backgroundColor: colorHex }} />
+							<span className="footerNote">Hex: {colorHex}</span>
+						</div>
+					)}
 				</section>
 			</form>
 
@@ -493,6 +504,26 @@ function normalizeToFive(arr) {
 	}
 	if (!base[0].text) base[0].text = 'You are a helpful assistant.';
 	return base;
+}
+
+function extractHexFromText(text) {
+	const normalize = (h) => {
+		if (!h) return '';
+		let s = String(h).trim();
+		if (s.startsWith('#')) s = s.slice(1);
+		s = s.toUpperCase();
+		if (/^[0-9A-F]{6}$/.test(s)) return `#${s}`;
+		if (/^[0-9A-F]{3}$/.test(s)) return `#${s}`;
+		return '';
+	};
+	try {
+		const obj = JSON.parse(String(text));
+		const hx = normalize(obj?.hex);
+		if (hx) return hx;
+	} catch {}
+	const m = String(text).match(/"hex"\s*:\s*"(#?[0-9A-Fa-f]{3,6})"/);
+	if (m) return normalize(m[1]);
+	return '';
 }
 
 
