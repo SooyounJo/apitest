@@ -39,7 +39,16 @@ export default async function handler(req, res) {
 			return res.status(200).json({ ok: true, storage: 'kv', key });
 		}
 
-		// Fallback: Save into data/data.jsonl inside project (dev/local only)
+		// Block writes on Vercel without KV (read-only FS). Instruct to configure KV.
+		const isVercel = !!process.env.VERCEL || !!process.env.NEXT_RUNTIME;
+		if (isVercel) {
+			return res.status(500).json({
+				message:
+					'Running on Vercel with read-only filesystem. Configure Vercel KV (KV_REST_API_URL, KV_REST_API_TOKEN) to enable persistent saves.'
+			});
+		}
+
+		// Fallback for local/dev: Save into data/data.jsonl inside project
 		const dirPath = path.join(process.cwd(), 'data');
 		await fs.promises.mkdir(dirPath, { recursive: true });
 		const filePath = path.join(dirPath, 'data.jsonl');
