@@ -9,11 +9,11 @@ export default function HomePage() {
 	return (
 		<>
 			<Head>
-				<title>Open API Model Test</title>
+				<title>함께해요 해피 에이피아이</title>
 				<meta name="viewport" content="width=device-width, initial-scale=1" />
 				<meta
 					name="description"
-					content="Next.js JS starter with an OpenAI-like model test interface"
+					content="함께해요 해피 에이피아이 — Next.js 기반 모델 테스트 인터페이스"
 				/>
 			</Head>
 			<ModelTester />

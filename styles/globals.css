@@ -17,16 +17,18 @@ html,
 body,
 #__next {
 	height: 100%;
+	overflow: hidden;
 }
 
 body {
 	margin: 0;
-	font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
-		Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol,
+	font-family: Pretendard, 'Helvetica Neue', Helvetica, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+		Arial, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol,
 		Noto Color Emoji;
 	background: radial-gradient(1200px 600px at 50% -200px, #18212f, #0b0f14);
 	color: var(--text);
 	font-weight: 500;
+	overflow: hidden;
 }
 
 a {
@@ -38,6 +40,10 @@ a {
 	max-width: 980px;
 	margin: 0 auto;
 	padding: 24px;
+	height: 100vh;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
 }
 
 .header {
@@ -73,6 +79,8 @@ a {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: 16px;
+	flex: 1;
+	overflow: hidden;
 }
 
 @media (max-width: 900px) {
@@ -83,6 +91,7 @@ a {
 
 .section {
 	padding: 16px;
+	overflow: hidden;
 }
 
 .sectionTitle {
@@ -109,6 +118,21 @@ a {
 	outline: none;
 	transition: border-color 0.15s ease;
 	font-weight: 500;
+}
+
+.textareaPrompt {
+	background: #111827; /* brighter than base to signal editability */
+	border-color: #334155;
+}
+
+.textareaPrompt::placeholder {
+	color: #94a3b8;
+	opacity: 0.7;
+}
+
+.textareaPrompt:focus {
+	border-color: #60a5fa;
+	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
 .textarea {
@@ -209,12 +233,86 @@ a {
 	margin-bottom: 8px;
 }
 
+.slotPreviewRow {
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.slotPreview {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	border: 1px solid var(--border);
+	background: rgba(2, 6, 23, 0.4);
+	border-radius: 8px;
+	padding: 6px 8px;
+	cursor: pointer;
+	min-height: 34px;
+}
+
+.slotPreviewActive {
+	border-color: #93c5fd;
+	box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.25);
+}
+
+.slotPreviewEmpty {
+	opacity: 0.6;
+	font-style: italic;
+}
+
+.slotPreviewNum {
+	background: #0b1220;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 2px 6px;
+	font-size: 12px;
+}
+
+.slotPreviewText {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.selectedBox {
+	border: 1px solid var(--border);
+	background: rgba(2, 6, 23, 0.4);
+	border-radius: 10px;
+	padding: 12px;
+}
+
+.selectedBoxTitle {
+	font-size: 12px;
+	color: var(--muted);
+	margin-bottom: 6px;
+}
+
+.selectedBoxText {
+	color: var(--text);
+	opacity: 0.9;
+}
+
+.selectedBoxClamp {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.selectedBoxExpanded {
+	white-space: pre-wrap;
+}
+
 @media (max-width: 900px) {
 	.presetEditRow {
 		grid-template-columns: 1fr;
 	}
 	.presetSetRow {
 		flex-wrap: wrap;
+	}
+	.slotPreviewRow {
+		grid-template-columns: 1fr 1fr;
 	}
 }
 
@@ -223,6 +321,9 @@ a {
 	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
 		"Liberation Mono", "Courier New", monospace;
 	line-height: 1.6;
+	min-height: 24vh;
+	max-height: 56vh;
+	overflow: auto;
 }
 
 .footerNote {
