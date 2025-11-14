@@ -153,6 +153,71 @@ a {
 	border: 1px solid var(--border);
 }
 
+.buttonDanger {
+	background: linear-gradient(180deg, #ef4444, #dc2626);
+	color: white;
+	border: 1px solid #b91c1c;
+}
+
+.presetRow {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.presetBtn {
+	background: transparent;
+	color: var(--text);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	padding: 6px 10px;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.presetBtnNumber {
+	min-width: 36px;
+	height: 32px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 700;
+}
+
+.presetBtnActive {
+	background: linear-gradient(180deg, #334155, #1e293b);
+	border-color: #93c5fd;
+	box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.25);
+}
+
+.presetEditRow {
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.presetEditItem {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+
+.presetSetRow {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+@media (max-width: 900px) {
+	.presetEditRow {
+		grid-template-columns: 1fr;
+	}
+	.presetSetRow {
+		flex-wrap: wrap;
+	}
+}
+
 .result {
 	white-space: pre-wrap;
 	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
