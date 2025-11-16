@@ -71,6 +71,44 @@ Choose the closest among neutral-like emotions:
 - 가라앉음 (B8C0C8)
 - 안정감 (B7D8C8)
 - 희미함 (E6E0E2)
+ 
+ENVIRONMENT OUTPUT:
+Also include these fields in the same JSON:
+- "temperature_c": number (e.g., 21)
+- "humidity_pct": number 0–100
+- "brightness_level": one of [1,2,3,4,5] (room brightness level)
+- "lighting_color_hex": hex string (e.g., FFF652)
+- "music": short recommendation (e.g., "ambient/piano 60–80bpm")
+
+ENVIRONMENT GUIDELINES:
+- High arousal (기쁨/흥분/설렘/경쾌 등): 20–21°C, 40–45% RH, music "upbeat/pop 100–120bpm"
+- Calm/neutral (평온/편안/안정감/담담/잔잔함 등): 21–22°C, 45–50% RH, "ambient/piano 60–80bpm"
+- Fatigue/low energy (피로/무기력/번아웃/소진 등): 22–24°C, 50–55% RH, "lofi/chill 60–70bpm"
+- Irritable/angry (짜증/분노/경계/긴장): 20–21°C, 40–45% RH, "acoustic/soothing 70–90bpm"
+- Melancholic/down (공허/허무/가라앉음/음울/체념): 21–22°C, 50–55% RH, "new age/soft piano 60–80bpm"
+
+SELECTION CONSTRAINTS (use only these):
+- temperature_c ∈ {20,21,22,23,24,25,26,27,28,29,30}
+- humidity_pct ∈ {30,35,40,45,50,55,60,65,70}
+- brightness_level ∈ {1,2,3,4,5}
+- music ∈ {
+  "Life is - Scott Burkely",
+  "Glow - Scott Burkely",
+  "Clean Soul - Kevin MacLeod",
+  "Borealis - Scott Burkely",
+  "Solstice - Scott Burkely",
+  "New Beginnings - Tokyo Music Walker",
+  "Solace - Scott Burkely",
+  "The Travelling Symphony - Savfk",
+  "331Music - Happy Stroll",
+  "Derek Fiechter & Brandon Fiechter - Ukulele Dance",
+  "Kevin MacLeod - Happy Alley",
+  "Sunny Side Up - Victor Lundberg",
+  "Amberlight - Scott Burkely",
+  "Shoulders Of Giants - Scott Burkely",
+  "Echoes - Scott Burkely",
+  "A Kind Of Hope - Scott Burkely"
+}
 `,
 	// 2 (updated per user request)
 	`You are a specialized AI model. Your sole purpose is to receive any user text input, detect its underlying emotion, and map it to the single closest emotion from the predefined 100-item Emotion-Color list.
@@ -82,10 +120,14 @@ Your output MUST ONLY be a single JSON object in this exact format. No other tex
 {
   "emotion": "...",
   "hex": "...",
-  "similarity_reason": "..."
+  "similarity_reason": "...",
+  "temperature_c": <number>,
+  "humidity_pct": <number>,
+  "brightness_level": <1|2|3|4|5>,
+  "music": "..."
 }
 
-CRITICAL RULE: The emotion and hex fields MUST be copied exactly from the "Emotion–Color Database" (Section 5). Do not guess, generate, or alter the HEX code. You must look up the chosen emotion in the list and use its corresponding HEX code.
+CRITICAL RULE: The emotion and hex fields MUST be copied exactly from the "Emotion–Color Database" (Section 5). Do not guess, generate, or alter the HEX code. You must look up the chosen emotion in the list and use its corresponding HEX code. For lighting, do NOT invent new color keys; if lighting is required, prefer using the same "hex" color for ambient-light hint, but do not add extra keys unless specified.
 
 Input Processing & Mapping Principles
 This is your primary logic. You must map all inputs except those in the "Strict Fallback Rule" section.
@@ -112,6 +154,36 @@ D. Ambiguous, Neutral, or Nonsense Input (Core Philosophy)
   - “하...” → 허무(D5D9E0) or 가라앉음(B8C0C8)
 - No Clear Emotion: If the input is neutral, vague, or random (but NOT sexual/abusive), choose one from:
   공허(C8E0E0), 무심함(D9D6CF or B4BABD), 담담(F1EFEA), 가라앉음(B8C0C8), 안정감(B7D8C8), 희미함(E6E0E2)
+
+ENVIRONMENT GUIDELINES (temperature_c, humidity_pct, music only):
+- High arousal (기쁨/흥분/설렘/경쾌 등): 20–21°C, 40–45% RH, "upbeat/pop 100–120bpm"
+- Calm/neutral (평온/편안/안정감/담담/잔잔함 등): 21–22°C, 45–50% RH, "ambient/piano 60–80bpm"
+- Fatigue/low energy (피로/무기력/번아웃/소진 등): 22–24°C, 50–55% RH, "lofi/chill 60–70bpm"
+- Irritable/angry (짜증/분노/경계/긴장): 20–21°C, 40–45% RH, "acoustic/soothing 70–90bpm"
+- Melancholic/down (공허/허무/가라앉음/음울/체념): 21–22°C, 50–55% RH, "new age/soft piano 60–80bpm"
+
+SELECTION CONSTRAINTS (use only these):
+- temperature_c ∈ {20,21,22,23,24,25,26,27,28,29,30}
+- humidity_pct ∈ {30,35,40,45,50,55,60,65,70}
+- brightness_level ∈ {1,2,3,4,5}
+- music ∈ {
+  "Life is - Scott Burkely",
+  "Glow - Scott Burkely",
+  "Clean Soul - Kevin MacLeod",
+  "Borealis - Scott Burkely",
+  "Solstice - Scott Burkely",
+  "New Beginnings - Tokyo Music Walker",
+  "Solace - Scott Burkely",
+  "The Travelling Symphony - Savfk",
+  "331Music - Happy Stroll",
+  "Derek Fiechter & Brandon Fiechter - Ukulele Dance",
+  "Kevin MacLeod - Happy Alley",
+  "Sunny Side Up - Victor Lundberg",
+  "Amberlight - Scott Burkely",
+  "Shoulders Of Giants - Scott Burkely",
+  "Echoes - Scott Burkely",
+  "A Kind Of Hope - Scott Burkely"
+}
 
 Strict Fallback Rule (“무색” Exception)
 - Use "무색" minimally and ONLY if the input contains:
@@ -235,8 +307,8 @@ Purpose:
 You receive any form of user input (emotions, sentences, slang, jokes, physical states, mild profanity, nonsense, etc.),
 → Detect the emotional tone,
 → Map it to the most appropriate emotion from a fixed 100-item Emotion–Color list,
-→ Return output in strict JSON format only:
-{ "emotion": "...", "hex": "...", "similarity_reason": "..." }
+→ Return ONLY one JSON object containing:
+{ "emotion": "...", "hex": "...", "similarity_reason": "...", "temperature_c": <number>, "humidity_pct": <number>, "brightness_level": <1|2|3|4|5>, "lighting_color_hex": "...", "music": "..." }
 
 Core Rules
 1. Emotion Detection & Mapping
@@ -263,7 +335,7 @@ If unclear but not abusive/sexual, avoid “무색”; choose from neutral feeli
 	`Emotion-to-Color Mapping Core Model
 
 You are an Emotion-to-Color Mapping Model. Your sole purpose is to analyze any user text and return a single JSON object:
-{ "emotion": "...", "hex": "...", "similarity_reason": "..." }
+{ "emotion": "...", "hex": "...", "similarity_reason": "...", "temperature_c": <number>, "humidity_pct": <number>, "brightness_level": <1|2|3|4|5>, "lighting_color_hex": "...", "music": "..." }
 Follow:
 - Always infer one emotion from the fixed database.
 - Avoid fallback unless explicit sexual/abusive/harassing content appears.
@@ -428,7 +500,11 @@ Return exactly:
 {
   "emotion": "...",
   "hex": "...",
-  "similarity_reason": "..."
+  "similarity_reason": "...",
+  "temperature_c": <number>,
+  "humidity_pct": <number>,
+  "brightness_level": <1|2|3|4|5>,
+  "music": "..."
 }
 No other text or fields are allowed.
 Never output natural language.
@@ -452,6 +528,9 @@ export default function ModelTester() {
 	const [statusMessage, setStatusMessage] = useState('');
 	const [isPresetExpanded, setIsPresetExpanded] = useState(false);
 	const [colorHex, setColorHex] = useState('');
+	const [environment, setEnvironment] = useState(null);
+	const [emotionName, setEmotionName] = useState('');
+	const [reasonText, setReasonText] = useState('');
 
 	// No user-edited presets; fixed set only
 
@@ -465,6 +544,9 @@ export default function ModelTester() {
 		setIsLoading(true);
 		setOutputText('');
 		setColorHex('');
+		setEnvironment(null);
+		setEmotionName('');
+		setReasonText('');
 		try {
 			const response = await fetch('/api/generate', {
 				method: 'POST',
@@ -486,8 +568,30 @@ export default function ModelTester() {
 			const result = await response.json();
 			setOutputText(result.output || '');
 			setTokenUsage(result.usage || null);
-			const hx = extractHexFromText(result.output || '');
+			const rawText = result.output || '';
+			const hx = extractHexFromText(rawText);
 			if (hx) setColorHex(hx);
+			const emo = extractEmotionFromText(rawText);
+			if (emo) setEmotionName(emo);
+			const reason = extractReasonFromText(rawText);
+			if (reason) setReasonText(reason);
+			let envObj = extractEnvFromText(rawText);
+			if (!envObj && emo) {
+				envObj = getEnvironmentForEmotion(emo);
+			}
+			if (!envObj) {
+				envObj = {
+					tempC: 21,
+					humidityPct: 50,
+					brightnessLevel: 3,
+					lightingColorHex: hx || '',
+					music: 'Life is - Scott Burkely'
+				};
+			} else {
+				if (hx && !envObj.lightingColorHex) envObj.lightingColorHex = hx;
+				if (!envObj.brightnessLevel) envObj.brightnessLevel = 3;
+			}
+			setEnvironment(envObj);
 		} catch (err) {
 			setErrorMessage(
 				err instanceof Error ? err.message : 'Unexpected error occurred'
@@ -553,6 +657,16 @@ export default function ModelTester() {
 		}
 	}, [outputText, userPrompt]);
 
+	const handleCopyValue = useCallback(async (value) => {
+		try {
+			await copyToClipboard(String(value ?? ''));
+			setCopyMessage('Copied');
+			setTimeout(() => setCopyMessage(''), 1200);
+		} catch {
+			setCopyMessage('Copy failed');
+		}
+	}, []);
+
 	const handleResetAll = useCallback(() => {
 		// Keep current system prompt, preset selection, model, and label as-is.
 		setUserPrompt('');
@@ -561,6 +675,7 @@ export default function ModelTester() {
 		setTokenUsage(null);
 		setCopyMessage('');
 		setColorHex('');
+		setEnvironment(null);
 	}, []);
 
 	return (
@@ -660,22 +775,109 @@ export default function ModelTester() {
 
 				<section className="panel section">
 					<div className="sectionTitle">Result</div>
-					{errorMessage ? (
-						<div style={{ color: 'var(--danger)' }}>{errorMessage}</div>
-					) : (
-						<div className="result">{outputText || '—'}</div>
+					{errorMessage ? <div style={{ color: 'var(--danger)' }}>{errorMessage}</div> : null}
+					{colorHex && (
+						<div
+							className="colorRow clickable"
+							title="Copy hex"
+							onClick={() => handleCopyValue(colorHex)}
+							role="button"
+							tabIndex={0}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									handleCopyValue(colorHex);
+								}
+							}}
+						>
+							<span className="colorDot" style={{ backgroundColor: colorHex }} />
+							<span className="footerNote">Hex: {colorHex}</span>
+						</div>
+					)}
+					{emotionName && (
+						<div
+							className="card clickable"
+							style={{ marginTop: 8 }}
+							title="Copy emotion"
+							onClick={() => handleCopyValue(emotionName)}
+							role="button"
+							tabIndex={0}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									handleCopyValue(emotionName);
+								}
+							}}
+						>
+							<div className="cardTitle">1) 도출된 감정</div>
+							<div className="emotionRow">
+								{colorHex ? <span className="chipDot" style={{ backgroundColor: colorHex }} /> : null}
+								<span>{emotionName}</span>
+							</div>
+						</div>
+					)}
+					{environment && (
+						<div className="miniGrid">
+							<div
+								className="miniCard clickable"
+								title="Copy temperature"
+								onClick={() => handleCopyValue(`${environment.tempC}°C`)}
+								role="button"
+								tabIndex={0}
+								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(`${environment.tempC}°C`); } }}
+							>
+								<div className="miniTitle">온도</div>
+								<div className="miniValue">{environment.tempC}°C</div>
+							</div>
+							<div
+								className="miniCard clickable"
+								title="Copy humidity"
+								onClick={() => handleCopyValue(`${environment.humidityPct}%`)}
+								role="button"
+								tabIndex={0}
+								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(`${environment.humidityPct}%`); } }}
+							>
+								<div className="miniTitle">습도</div>
+								<div className="miniValue">{environment.humidityPct}%</div>
+							</div>
+							<div
+								className="miniCard clickable"
+								title="Copy lighting color hex"
+								onClick={() => handleCopyValue(environment.lightingColorHex || '')}
+								role="button"
+								tabIndex={0}
+								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.lightingColorHex || ''); } }}
+							>
+								<div className="miniTitle">조명 컬러</div>
+								<div className="miniValue" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+									{environment.lightingColorHex ? <span className="chipDot" style={{ backgroundColor: environment.lightingColorHex }} /> : null}
+									{environment.lightingColorHex || '-'}
+								</div>
+							</div>
+							<div
+								className="miniCard clickable"
+								title="Copy music"
+								onClick={() => handleCopyValue(environment.music)}
+								role="button"
+								tabIndex={0}
+								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.music); } }}
+							>
+								<div className="miniTitle">음악</div>
+								<div className="miniValue">{environment.music}</div>
+							</div>
+						</div>
+					)}
+					{reasonText && (
+						<div className="card" style={{ marginTop: 8 }}>
+							<div className="cardTitle">3) 도출 이유</div>
+							<div className="reasonText">{shortReason(reasonText)}</div>
+						</div>
 					)}
 					{tokenUsage && (
 						<div className="footerNote" style={{ marginTop: 8 }}>
 							Tokens — input: {tokenUsage.prompt_tokens ?? '—'}, output:{' '}
 							{tokenUsage.completion_tokens ?? '—'}, total:{' '}
 							{tokenUsage.total_tokens ?? '—'}
-						</div>
-					)}
-					{colorHex && (
-						<div className="colorRow">
-							<span className="colorDot" style={{ backgroundColor: colorHex }} />
-							<span className="footerNote">Hex: {colorHex}</span>
 						</div>
 					)}
 				</section>
@@ -736,6 +938,12 @@ function previewLong(text) {
 	return t.length > 160 ? t.slice(0, 157) + '…' : t;
 }
 
+function shortReason(text) {
+	const t = String(text || '').trim();
+	if (!t) return '';
+	return t.length > 180 ? t.slice(0, 177) + '…' : t;
+}
+
 function normalizeToFive(arr) {
 	const base = [
 		{ id: 'slot1', text: '' },
@@ -769,6 +977,131 @@ function extractHexFromText(text) {
 	const m = String(text).match(/"hex"\s*:\s*"(#?[0-9A-Fa-f]{3,6})"/);
 	if (m) return normalize(m[1]);
 	return '';
+}
+
+function extractEmotionFromText(text) {
+	try {
+		const obj = JSON.parse(String(text));
+		if (obj && typeof obj.emotion === 'string') return obj.emotion;
+	} catch {}
+	const m = String(text).match(/"emotion"\s*:\s*"(.*?)"/);
+	return m ? m[1] : '';
+}
+
+function extractReasonFromText(text) {
+	try {
+		const obj = JSON.parse(String(text));
+		if (obj && typeof obj.similarity_reason === 'string') return obj.similarity_reason;
+	} catch {}
+	const m = String(text).match(/"similarity_reason"\s*:\s*"(.*?)"/s);
+	return m ? m[1] : '';
+}
+
+function extractEnvFromText(text) {
+	try {
+		const obj = JSON.parse(String(text));
+		if (!obj || typeof obj !== 'object') return null;
+		const toNumber = (v) => {
+			if (typeof v === 'number') return v;
+			const n = Number(String(v).replace(/[^\d.]/g, ''));
+			return Number.isFinite(n) ? n : null;
+		};
+		const toInt = (v) => {
+			const n = toNumber(v);
+			return Number.isFinite(n) ? Math.round(n) : null;
+		};
+		const normalizeHex = (h) => {
+			if (!h) return '';
+			let s = String(h).trim();
+			if (s.startsWith('#')) s = s.slice(1);
+			s = s.toUpperCase();
+			if (/^[0-9A-F]{6}$/.test(s) || /^[0-9A-F]{3}$/.test(s)) return `#${s}`;
+			return '';
+		};
+		const tempC =
+			toNumber(obj.temperature_c) ??
+			toNumber(obj.temp_c) ??
+			toNumber(obj.tempC) ??
+			null;
+		const humidityPct =
+			toNumber(obj.humidity_pct) ??
+			toNumber(obj.humidity) ??
+			toNumber(obj.humidityPct) ??
+			null;
+		const brightnessLevel =
+			toInt(obj.brightness_level) ??
+			toInt(obj.brightness) ??
+			null;
+		const illuminanceLux =
+			toNumber(obj.illuminance_lux) ??
+			null;
+		const lightingColorHex =
+			normalizeHex(obj.lighting_color_hex) ||
+			normalizeHex(obj.lightingHex) ||
+			normalizeHex(obj.lighting_color) ||
+			'';
+		const music =
+			typeof obj.music === 'string'
+				? obj.music
+				: typeof obj.music_recommendation === 'string'
+				? obj.music_recommendation
+				: '';
+		if (tempC !== null || humidityPct !== null || brightnessLevel !== null || illuminanceLux !== null || lightingColorHex || music) {
+			return {
+				tempC: tempC ?? 21,
+				humidityPct: humidityPct ?? 50,
+				brightnessLevel: brightnessLevel ?? 3,
+				illuminanceLux: illuminanceLux ?? null,
+				lightingColorHex: lightingColorHex || '',
+				music: music || 'ambient'
+			};
+		}
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+function getEnvironmentForEmotion(emotion) {
+	const e = String(emotion || '').trim();
+	const presets = [
+		{
+			match: ['기쁨', '설렘', '경쾌', '감격', '흥미', '기대', '활력', '상쾌함', '청량'],
+			value: { tempC: 21.5, humidityPct: 43, brightnessLevel: 4, lightingColorHex: '', music: '331Music - Happy Stroll' }
+		},
+		{
+			match: ['평온', '편안', '안정감', '담담', '잔잔함', '고요함', '조용함', '완화'],
+			value: { tempC: 21.0, humidityPct: 48, brightnessLevel: 2, lightingColorHex: '', music: 'Life is - Scott Burkely' }
+		},
+		{
+			match: ['분노', '짜증', '경계', '긴장'],
+			value: { tempC: 20.5, humidityPct: 44, brightnessLevel: 3, lightingColorHex: '', music: 'The Travelling Symphony - Savfk' }
+		},
+		{
+			match: ['피로', '무기력', '번아웃', '소진'],
+			value: { tempC: 23.0, humidityPct: 52, brightnessLevel: 2, lightingColorHex: '', music: 'New Beginnings - Tokyo Music Walker' }
+		},
+		{
+			match: ['공허', '허무', '가라앉음', '음울', '체념'],
+			value: { tempC: 21.5, humidityPct: 52, brightnessLevel: 2, lightingColorHex: '', music: 'Solace - Scott Burkely' }
+		},
+		{
+			match: ['갈증'],
+			value: { tempC: 21.0, humidityPct: 48, brightnessLevel: 3, lightingColorHex: '', music: 'Shoulders Of Giants - Scott Burkely' }
+		},
+		{
+			match: ['두려움', '고독'],
+			value: { tempC: 21.0, humidityPct: 50, brightnessLevel: 2, lightingColorHex: '', music: 'Solstice - Scott Burkely' }
+		},
+		{
+			match: ['흥분'],
+			value: { tempC: 21.5, humidityPct: 45, brightnessLevel: 4, lightingColorHex: '', music: 'Sunny Side Up - Victor Lundberg' }
+		}
+	];
+	for (const p of presets) {
+		if (p.match.includes(e)) return p.value;
+	}
+	return { tempC: 21, humidityPct: 50, brightnessLevel: 3, lightingColorHex: '', music: 'Life is - Scott Burkely' };
 }
 
 
