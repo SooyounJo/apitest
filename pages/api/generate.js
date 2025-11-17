@@ -582,27 +582,7 @@ function deriveEmotionRgbFromHex(baseHex, quadrant) {
 	}
 }
 
-function kelvinToRgb(k) {
-	let temp = Number(k);
-	if (!Number.isFinite(temp)) return { r: 255, g: 244, b: 229 };
-	temp = Math.max(1000, Math.min(40000, temp)) / 100;
-	let red, green, blue;
-	if (temp <= 66) {
-		red = 255;
-		green = 99.4708025861 * Math.log(temp) - 161.1195681661;
-		if (temp <= 19) {
-			blue = 0;
-		} else {
-			blue = 138.5177312231 * Math.log(temp - 10) - 305.0447927307;
-		}
-	} else {
-		red = 329.698727446 * Math.pow(temp - 60, -0.1332047592);
-		green = 288.1221695283 * Math.pow(temp - 60, -0.0755148492);
-		blue = 255;
-	}
-	const to = (v) => Math.max(0, Math.min(255, Math.round(v)));
-	return { r: to(red), g: to(green), b: to(blue) };
-}
+// kelvinToRgb was removed as we now derive RGB from the emotion color/complement rule
 
 // ---------- New-schema enforcement (temperature_celsius, humidity_percent, music_title/artist, lighting_* ) ----------
 const QUADRANT_TARGETS = {
