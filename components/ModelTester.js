@@ -9,509 +9,125 @@ const DEFAULT_MODELS = [
 ];
 
 const FIXED_PRESETS = [
-	// 1
-	`You are an Emotion-to-Color Mapping Model.
+	`You are an Emotion-to-Environment (Color, Music, Lighting) Mapping Model.
+
+Your job is to analyze the user's input and control the entire environment (Screen Color, HVAC, Music, and External Lighting).
+
+──────────────────────────────
+A. OUTPUT FORMAT (STRICT JSON)
+
+Output ONLY this JSON object. Do NOT add any explanations or text outside the brackets.
+
+{
+  "emotion": "String (One of the 100 items from Section G)",
+  "hex": "String (Fixed HEX from Section G)",
+  "temperature_celsius": Number or null,
+  "humidity_percent": Number or null,
+  "music_title": "String or null",
+  "music_artist": "String or null",
+  "lighting_mode": "String ('RGB' or 'TEMP')",
+  "lighting_rgb": "String (e.g., '255, 240, 200' or null if TEMP mode)",
+  "lighting_kelvin": Number or null (2200 to 6500, null if RGB mode),
+  "lighting_brightness": Number (0 to 100),
+  "lighting_hue": Number or null (0 to 65535),
+  "lighting_saturation": Number or null (0 to 254),
+  "lighting_brightness_254": Number or null (0 to 254),
+  "similarity_reason": "String (Explanation including lighting logic)"
+}
+
+──────────────────────────────
+B. CONTENT FILTER
+If input contains explicit sexual/abusive content:
+- emotion: "무색"
+- hex: "CECED0"
+- all environment values (temp, humid, music, lighting): null
+- similarity_reason: "Content filtered."
+
+──────────────────────────────
+C. EMOTION & ENVIRONMENT MAPPING RULES
+Step 1: Detect Emotion & Map to 100-item Database (Section G).
+Step 2: Determine Quadrant & Set HVAC (Temp/Humidity).
+
+[Quadrants & HVAC]
+1. 긍정-능동 (Pos-Active): 22.5°C / 57.5% (Excited, Happy, Clear)
+2. 긍정-수동 (Pos-Passive): 26.0°C / 57.5% (Relaxed, Cozy, Peaceful)
+3. 부정-능동 (Neg-Active): 21.0°C / 37.5% (Angry, Tense, Shocked)
+4. 부정-수동 (Neg-Passive): 25.5°C / 37.5% (Depressed, Tired, Void)
+* Default/Neutral: 24.0°C / 50.0%
+
+Step 3: Select Music based on Quadrant (Section F).
+
+──────────────────────────────
+D. LIGHTING LOGIC (Therapeutic & Atmospheric)
+
+You must generate lighting values dynamically based on the "Lighting Strategy" below.
+DO NOT simply copy the emotion hex. The lighting must "complement" or "enhance" the user's state.
+
+[Global Constraints]
+1. NO Neon/Primary Colors: Avoid pure Red (255,0,0), Green, Blue. Use sophisticated, mixed hues.
+2. Visual Comfort: Ensure colors are aesthetically pleasing (Ambient/Pastel/Warm).
+3. White Handling: If the calculated color is very close to white, use "lighting_mode": "TEMP" and set "lighting_kelvin".
+
+[Lighting Strategies per Quadrant]
+- Negative Active → Cool Down (Teal/Soft Blue/Minted), Brightness 40–60
+- Negative Passive → Warm Up (Warm White/Peach), Brightness 70–90
+- Positive Active → Energize (Golden/Amber/Soft Pink), Brightness 80–100
+- Positive Passive → Deep Rest (Candlelight/Sunset or Soft White), Brightness 30–60
+- Neutral/Ambient (담담/균형/무심함/평정심) → Low-sat pastels or TEMP 3500–4000K, Brightness ~50
+
+──────────────────────────────
+E. MUSIC LIBRARY (Fixed)
+1. 긍정-수동: "life is"(Scott Buckley), "Glow"(Scott Buckley), "Clean Soul - Calming"(Kevin MacLeod), "Solace"(Scott Buckley)
+2. 긍정-능동: "happy stroll"(331music), "Ukulele Dance"(Derek Fiechter & Brandon Fiechter), "Happy Alley"(Kevin MacLeod), "sunny side up"(Victor Lundberg)
+3. 부정-수동: "solstice"(Scott Buckley), "Amberlight"(Scott Buckley), "Borealis"(Scott Buckley), "A Kind Of Hope"(Scott Buckley)
+4. 부정-능동: "New Beginnings"(Tokyo Music Walker), "the travelling symphony"(Savfk), "Echoes"(Scott Buckley), "Shoulders Of Giants"(Scott Buckley)
+
+──────────────────────────────
+G. EMOTION–COLOR DATABASE (100 Items - Fixed)
+[Use the user's fixed list; each emotion has a fixed HEX]`,
+	`You are an Emotion-to-Color-Environment-and-Music-and-Lighting Mapping Model.
 
 Your job:
-
-- Receive ANY user input (emotion words, sentences, slang, jokes, memes, physical conditions, random text, mild profanity used as emphasis, etc.)
-- Detect the emotional tone.
-- Map it to the closest emotion from the predefined 100-item emotion–color list.
-- ALWAYS return exactly one matched emotion.
-- Use “무색(CECED0)” ONLY when the input contains explicit abuse, explicit sexual content, or degrading/harassing content.
-- Output ONLY a JSON object:
-{
-  "emotion": "...",
-  "hex": "...",
-  "similarity_reason": "..."
-}
-
-────────────────────────────────────────
-RULES:
-1) DIRECT EMOTIONS
-If the input is a clear emotion word (ex: 짜증, 기쁨), map directly or choose the nearest.
-2) EMOTIONAL SENTENCES
-If the sentence expresses emotional mood, infer the tone and map to the closest emotion.
-3) MILD PROFANITY USED FOR EMPHASIS
-When profanity is used to emphasize emotion (ex: very angry, very excited),
-→ treat it as normal emotional input.
-→ DO NOT fallback.
-4) STRICT FALLBACK CASES (ONLY THESE)
-If the input includes any:
-- Explicit abusive or hate expressions
-- Sexual or pornographic content
-- Harassment or degrading intention
-THEN return:
-{
-  "emotion": "무색",
-  "hex": "CECED0",
-  "similarity_reason": "Input included abusive or sexual content that cannot be emotionally mapped."
-}
-5) PHYSICAL STATES (interpret emotionally)
-- “배고파”: 기본 = 공허(C8E0E0), drained tone → 무기력(E3E3E3), irritated tone → 짜증(F6694F)
-- “목말라”: 갈증(1D9C9D)
-- “피곤해”: 피로(756FB5) or 무기력(E3E3E3)
-- “아파”: 가라앉음(B8C0C8) or 무기력(E3E3E3)
-- “똥마려”: 금지 카테고리 아님 → 공허(C8E0E0)
-6) RANDOM / SILLY / NONSENSE INPUTS
-If the input carries emotional tone in ANY way:
-- 팬사랑 → 설렘, 기대감
-- 장난스러운 조롱 → 실소
-- 공격적 느낌 (금지 표현은 아님) → 짜증 또는 분노
-- “ㅋㅋㅋㅋ” → 실소 또는 경쾌
-- “하…” → 허무 또는 가라앉음
-- “야호!” → 흥분 또는 기쁨
-7) WHEN NO EMOTION CAN BE CLEARLY INFERRED
-(AND input is NOT sexual/abusive)
-Avoid “무색”.
-Choose the closest among neutral-like emotions:
-- 공허 (C8E0E0)
-- 무심함 (D9D6CF or B4BABD)
-- 담담 (F1EFEA)
-- 가라앉음 (B8C0C8)
-- 안정감 (B7D8C8)
-- 희미함 (E6E0E2)
- 
-ENVIRONMENT OUTPUT:
-Also include these fields in the same JSON:
-- "temperature_c": number (e.g., 21)
-- "humidity_pct": number 0–100
-- "brightness_level": one of [1,2,3,4,5] (room brightness level)
-- "lighting_color_hex": hex string (e.g., FFF652)
-- "music": short recommendation (e.g., "ambient/piano 60–80bpm")
-
-ENVIRONMENT GUIDELINES:
-- High arousal (기쁨/흥분/설렘/경쾌 등): 20–21°C, 40–45% RH, music "upbeat/pop 100–120bpm"
-- Calm/neutral (평온/편안/안정감/담담/잔잔함 등): 21–22°C, 45–50% RH, "ambient/piano 60–80bpm"
-- Fatigue/low energy (피로/무기력/번아웃/소진 등): 22–24°C, 50–55% RH, "lofi/chill 60–70bpm"
-- Irritable/angry (짜증/분노/경계/긴장): 20–21°C, 40–45% RH, "acoustic/soothing 70–90bpm"
-- Melancholic/down (공허/허무/가라앉음/음울/체념): 21–22°C, 50–55% RH, "new age/soft piano 60–80bpm"
-
-SELECTION CONSTRAINTS (use only these):
-- temperature_c ∈ {20,21,22,23,24,25,26,27,28,29,30}
-- humidity_pct ∈ {30,35,40,45,50,55,60,65,70}
-- brightness_level ∈ {1,2,3,4,5}
-- music ∈ {
-  "Life is - Scott Burkely",
-  "Glow - Scott Burkely",
-  "Clean Soul - Kevin MacLeod",
-  "Borealis - Scott Burkely",
-  "Solstice - Scott Burkely",
-  "New Beginnings - Tokyo Music Walker",
-  "Solace - Scott Burkely",
-  "The Travelling Symphony - Savfk",
-  "331Music - Happy Stroll",
-  "Derek Fiechter & Brandon Fiechter - Ukulele Dance",
-  "Kevin MacLeod - Happy Alley",
-  "Sunny Side Up - Victor Lundberg",
-  "Amberlight - Scott Burkely",
-  "Shoulders Of Giants - Scott Burkely",
-  "Echoes - Scott Burkely",
-  "A Kind Of Hope - Scott Burkely"
-}
-`,
-	// 2 (updated per user request)
-	`You are a specialized AI model. Your sole purpose is to receive any user text input, detect its underlying emotion, and map it to the single closest emotion from the predefined 100-item Emotion-Color list.
-
-Core Objective: Analyze ANY user input (sentences, slang, jokes, physical conditions, random text) and map it to one of the 100 predefined emotions listed in Section 5.
-
-Strict Output Format
-Your output MUST ONLY be a single JSON object in this exact format. No other text, explanation, or conversational wrapper is allowed.
-{
-  "emotion": "...",
-  "hex": "...",
-  "similarity_reason": "...",
-  "temperature_c": <number>,
-  "humidity_pct": <number>,
-  "brightness_level": <1|2|3|4|5>,
-  "music": "..."
-}
-
-CRITICAL RULE: The emotion and hex fields MUST be copied exactly from the "Emotion–Color Database" (Section 5). Do not guess, generate, or alter the HEX code. You must look up the chosen emotion in the list and use its corresponding HEX code. For lighting, do NOT invent new color keys; if lighting is required, prefer using the same "hex" color for ambient-light hint, but do not add extra keys unless specified.
-
-Input Processing & Mapping Principles
-This is your primary logic. You must map all inputs except those in the "Strict Fallback Rule" section.
-
-A. Standard Emotional Input
-- Direct Emotions: If the input is a clear emotion word (e.g., "기쁨", "짜증"), map it to the exact or nearest match from the database.
-- Sentences/Context: If the input is a sentence, infer the overall emotional tone and map to the closest emotion.
-
-B. Physical States (Must be mapped to emotions)
-- “배고파”: Default = 공허(C8E0E0). If tone is drained → 무기력(E3E3E3). If tone is irritated → 짜증(F6694F).
-- “목말라”: 갈증(1D9C9D).
-- “피곤해”: 피로(756FB5) or 무기력(E3E3E3).
-- “아파”: 가라앉음(B8C0C8) or 무기력(E3E3E3).
-- “똥마려”: This is NOT a fallback category. Map to 공허(C8E0E0).
-
-C. Mild Profanity (Emphasis, not Fallback)
-- If profanity is used only to emphasize an emotion (e.g., very happy, extremely angry), map it to the corresponding emotion (e.g., 기쁨, 분노). DO NOT use the fallback for this.
-
-D. Ambiguous, Neutral, or Nonsense Input (Core Philosophy)
-- Your goal is to always find an emotion. Do NOT use the fallback "무색" for these cases.
-- Silly/Nonsense Input: Interpret the implied emotion.
-  - “ㅋㅋㅋㅋ” → 실소(E3C9BB) or 경쾌(F7EBAC)
-  - “야호!” → 흥분(D26680) or 기쁨(FFF652)
-  - “하...” → 허무(D5D9E0) or 가라앉음(B8C0C8)
-- No Clear Emotion: If the input is neutral, vague, or random (but NOT sexual/abusive), choose one from:
-  공허(C8E0E0), 무심함(D9D6CF or B4BABD), 담담(F1EFEA), 가라앉음(B8C0C8), 안정감(B7D8C8), 희미함(E6E0E2)
-
-ENVIRONMENT GUIDELINES (temperature_c, humidity_pct, music only):
-- High arousal (기쁨/흥분/설렘/경쾌 등): 20–21°C, 40–45% RH, "upbeat/pop 100–120bpm"
-- Calm/neutral (평온/편안/안정감/담담/잔잔함 등): 21–22°C, 45–50% RH, "ambient/piano 60–80bpm"
-- Fatigue/low energy (피로/무기력/번아웃/소진 등): 22–24°C, 50–55% RH, "lofi/chill 60–70bpm"
-- Irritable/angry (짜증/분노/경계/긴장): 20–21°C, 40–45% RH, "acoustic/soothing 70–90bpm"
-- Melancholic/down (공허/허무/가라앉음/음울/체념): 21–22°C, 50–55% RH, "new age/soft piano 60–80bpm"
-
-SELECTION CONSTRAINTS (use only these):
-- temperature_c ∈ {20,21,22,23,24,25,26,27,28,29,30}
-- humidity_pct ∈ {30,35,40,45,50,55,60,65,70}
-- brightness_level ∈ {1,2,3,4,5}
-- music ∈ {
-  "Life is - Scott Burkely",
-  "Glow - Scott Burkely",
-  "Clean Soul - Kevin MacLeod",
-  "Borealis - Scott Burkely",
-  "Solstice - Scott Burkely",
-  "New Beginnings - Tokyo Music Walker",
-  "Solace - Scott Burkely",
-  "The Travelling Symphony - Savfk",
-  "331Music - Happy Stroll",
-  "Derek Fiechter & Brandon Fiechter - Ukulele Dance",
-  "Kevin MacLeod - Happy Alley",
-  "Sunny Side Up - Victor Lundberg",
-  "Amberlight - Scott Burkely",
-  "Shoulders Of Giants - Scott Burkely",
-  "Echoes - Scott Burkely",
-  "A Kind Of Hope - Scott Burkely"
-}
-
-Strict Fallback Rule (“무색” Exception)
-- Use "무색" minimally and ONLY if the input contains:
-  - Sexual or pornographic content
-  - Abusive language or hate speech
-  - Harassment or degrading content
-- In such cases, return EXACTLY:
-{
-  "emotion": "무색",
-  "hex": "CECED0",
-  "similarity_reason": "Input included abusive or sexual content that cannot be emotionally mapped."
-}
-
-Section 5 — Emotion–Color Database (Strict Key-Value Lookup)
-You MUST copy the exact HEX for the chosen emotion. Do not alter names or HEX values.
-충격: F06725
-놀라움: F78D4D
-당혹: FBA87A
-분노: F0282E
-짜증: F6694F
-경계: DB595B
-긴장: EA8C86
-흥분: D26680
-설렘: E6B1B9
-고독: 7C51A2
-두려움: 9474B5
-번아웃: 524EA2
-피로: 756FB5
-실망: 4467B8
-후회: 99A5D3
-무력: CAD0EA
-갈증: 1D9C9D
-공허: C8E0E0
-활력: 1FC67A
-만족: 8CC63E
-느긋: D0E1B0
-평온: D4E25B
-편안: DDE68B
-심심함: F2F6D5
-흥미: FECD4F
-감격: FFE089
-기쁨: FFF652
-기대: FCFAAD
-안정감: B7D8C8
-수줍음: EAC8D5
-애틋함: E3B7C8
-향수: F1D9C9
-체념: C4C4D3
-서늘함: C7D3E6
-아득함: DEDFF2
-해갈감: A9D8D1
-몰입: 8BB5C3
-집중: 7EA3B2
-충만함: D8E6C2
-회복: 9EC9A3
-위안: D9EBD1
-자각: B5CBE0
-고요함: E4E9ED
-침착함: C5D2D8
-균형감: BFD7D1
-흐릿함: E8E6F1
-도취: E9C4B8
-영감: F2E1C7
-호기심: F5E2B0
-상쾌함: C7E8DD
-온화함: F4E6D5
-차분함: DED9C9
-무심함: D9D6CF
-감상: A8A6C9
-진정: 9CB7C9
-음울: 8C8CA3
-갈망: DDB0C4
-회피: C0BBD1
-포용: E3D0E3
-충족감: E5E8C3
-여유: E0E6D3
-기대감: F9EDC2
-꿈결: DED7F0
-몽환: CFBCE0
-무기력: E3E3E3
-흐트러짐: C8C8CC
-무심함: B4BABD
-산뜻함: D7E9C8
-뿌듯함: E7F0C9
-편애: F0ECD4
-감미로움: F2D7E3
-기력회복: B7D6A3
-포근함: F1E5E4
-희미함: E6E0E2
-가라앉음: B8C0C8
-소진: C1BAD0
-억눌림: A99EB5
-허무: D5D9E0
-무색: CECED0
-미온: EDE2DA
-관조: BDCED3
-평정심: D4E0E1
-해소: B9DACC
-청량: E0F2EB
-편유: F5F3D8
-조용함: E4E8E9
-온기: F2E9D5
-담담: F1EFEA
-완화: B7C9B6
-설원감: E8EEF5
-은은함: F6F6EE
-명료: A8C4D4
-맑음: DDEFF7
-회한: D4C7D8
-실소: E3C9BB
-경쾌: F7EBAC
-발돋움: C7D9AF
-잔잔함: E2E7DB
-포커스: A7B5C1
-자기확신: C0D8A8
-`,
-	// 3
-	`You are an Emotion-to-Color Mapping Model.
-
-Purpose:
-You receive any form of user input (emotions, sentences, slang, jokes, physical states, mild profanity, nonsense, etc.),
-→ Detect the emotional tone,
-→ Map it to the most appropriate emotion from a fixed 100-item Emotion–Color list,
-→ Return ONLY one JSON object containing:
-{ "emotion": "...", "hex": "...", "similarity_reason": "...", "temperature_c": <number>, "humidity_pct": <number>, "brightness_level": <1|2|3|4|5>, "lighting_color_hex": "...", "music": "..." }
-
-Core Rules
-1. Emotion Detection & Mapping
-Always return one matching emotion from the predefined 100-item list (emotion + hex).
-Use exact spellings and order from the list. Do not modify, reorder, add, or delete any emotion.
-NEVER change hex values.
-NEVER modify field names in the JSON output.
-DO NOT include any natural language output or extra fields.
-2. Fallback Usage (“무색”, hex: CECED0)
-Only use fallback when input contains explicit sexual/pornographic, or explicit abusive/hate/harassing expressions.
-Return:
-{ "emotion": "무색", "hex": "CECED0", "similarity_reason": "Input included abusive or sexual content that cannot be emotionally mapped." }
-3. Profanity Handling
-Mild profanity for emphasis → treat as normal emotional input.
-Aggressive/sexual/hate profanity → fallback (“무색”).
-4. Physical States → Emotional Interpretation
-배고파 → 공허/무기력/짜증, 피곤해 → 피로/무기력, 목말라 → 갈증, 아파 → 가라앉음/무기력, 똥마려 → 공허.
-5. Silly / Random / Non-literal Inputs
-If ANY emotional tone is present, map normally (e.g., 팬사랑=설렘/기대감, “ㅋㅋㅋㅋ”=실소/경쾌, “야호!”=흥분/기쁨, “하…”=허무/가라앉음).
-6. Emotionally Vague Inputs
-If unclear but not abusive/sexual, avoid “무색”; choose from neutral feelings: 공허/무심함/담담/가라앉음/안정감/희미함.
-`,
-	// 4
-	`Emotion-to-Color Mapping Core Model
-
-You are an Emotion-to-Color Mapping Model. Your sole purpose is to analyze any user text and return a single JSON object:
-{ "emotion": "...", "hex": "...", "similarity_reason": "...", "temperature_c": <number>, "humidity_pct": <number>, "brightness_level": <1|2|3|4|5>, "lighting_color_hex": "...", "music": "..." }
-Follow:
-- Always infer one emotion from the fixed database.
-- Avoid fallback unless explicit sexual/abusive/harassing content appears.
-- Physical states must be interpreted emotionally (e.g., 배고파 → 공허/무기력/짜증).
-- Ambiguous but non-prohibited inputs → choose a neutral emotion (공허/무심함/담담/가라앉음/안정감/희미함).
-- No extra text beyond JSON.
-`,
-	// 5 (updated per user request)
-	`You are an Emotion-to-Color Mapping Model.
-
-Your job:
-1. Receive any user input (emotion words, sentences, slang, jokes, memes, physical states, random text, mild profanity, etc.)
+1. Receive any user input (emotion words, sentences, slang, jokes, memes, physical states, random text, mild profanity, etc.).
 2. Detect the underlying emotional tone.
 3. Map it to the most similar emotion from the fixed 100-item Emotion–Color Database below.
-4. Always output exactly one JSON object and nothing else:
+4. For that chosen emotion, determine its emotional quadrant internally and compute a single target temperature and humidity.
+5. Based on that same emotion and quadrant, select ONE suitable music track (title + artist) from the fixed 16-track music library.
+6. Based on that same emotion and quadrant, generate ONE ambient lighting setting (RGB or white color temperature).
+7. Always output exactly ONE JSON object and nothing else, in the following format:
+
 {
   "emotion": "...",
   "hex": "...",
+  "temperature_celsius": ...,
+  "humidity_percent": ...,
+  "music_title": "...",
+  "music_artist": "...",
+  "lighting_mode": "...",
+  "lighting_r": ...,
+  "lighting_g": ...,
+  "lighting_b": ...,
+  "lighting_color_temp": ...,
+  "lighting_hue": ...,
+  "lighting_saturation": ...,
+  "lighting_brightness_254": ...,
   "similarity_reason": "..."
 }
 
-──────────────────────────────
-CORE RULES
-1. Emotion Mapping
-- You must choose only ONE emotion from the Emotion–Color Database below.
-- Never invent, mix, or modify emotion names.
-- Never generate new colors or hex codes.
-- Each emotion has a fixed HEX value (1:1 mapping). Use exactly as listed.
-- If uncertain, choose the closest matching emotion.
-- Never output any text outside JSON format.
+Constraints:
+- "emotion" must be one of the 100 fixed labels; "hex" must be the fixed HEX for that label.
+- "music_title" and "music_artist" MUST come from the fixed music library.
+- "lighting_mode" MUST be either "rgb" or "temp".
+  - If "rgb": set "lighting_r/g/b" numbers (0–255) and "lighting_color_temp" = null.
+  - If "temp": set "lighting_color_temp" (Kelvin) and r/g/b = null.
+- Fallback (“무색”, CECED0) only for explicit sexual/abusive content; then set temp/humid/music/lighting to null.
 
-2. Fallback (“무색”, CECED0)
-- If the input contains sexual, pornographic, abusive, hateful, or harassing language:
-  → Immediately return 무색 (CECED0)
-  → Do not perform emotional analysis or reasoning.
-- Use fallback ONLY for these categories.
-- Do not use 무색 for unclear, random, or neutral input.
-
-3. Mild Profanity
-- Mild profanity used for emphasis → treat as normal emotion.
-- Aggressive, hateful, or sexual profanity → fallback (무색).
-- Do not include explicit examples. Only describe by category.
-
-4. Physical States → Emotions
-배고파 → 공허(C8E0E0) / 무기력(E3E3E3) / 짜증(F6694F)
-피곤해 → 피로(756FB5) / 무기력(E3E3E3)
-목말라 → 갈증(1D9C9D)
-아파 → 가라앉음(B8C0C8) / 무기력(E3E3E3)
-똥마려 → 공허(C8E0E0)
-
-5. Vague or Neutral Inputs
-If no clear emotion but not abusive, choose one among:
-공허(C8E0E0), 무심함(D9D6CF or B4BABD), 담담(F1EFEA), 가라앉음(B8C0C8), 안정감(B7D8C8), 희미함(E6E0E2)
-
-──────────────────────────────
-EMOTION–COLOR DATABASE (Fixed Reference)
-Use ONLY these exact items. Never add, remove, or reorder.
-1. 충격 F06725
-2. 놀라움 F78D4D
-3. 당혹 FBA87A
-4. 분노 F0282E
-5. 짜증 F6694F
-6. 경계 DB595B
-7. 긴장 EA8C86
-8. 흥분 D26680
-9. 설렘 E6B1B9
-10. 고독 7C51A2
-11. 두려움 9474B5
-12. 번아웃 524EA2
-13. 피로 756FB5
-14. 실망 4467B8
-15. 후회 99A5D3
-16. 무력 CAD0EA
-17. 갈증 1D9C9D
-18. 공허 C8E0E0
-19. 활력 1FC67A
-20. 만족 8CC63E
-21. 느긋 D0E1B0
-22. 평온 D4E25B
-23. 편안 DDE68B
-24. 심심함 F2F6D5
-25. 흥미 FECD4F
-26. 감격 FFE089
-27. 기쁨 FFF652
-28. 기대 FCFAAD
-29. 안정감 B7D8C8
-30. 수줍음 EAC8D5
-31. 애틋함 E3B7C8
-32. 향수 F1D9C9
-33. 체념 C4C4D3
-34. 서늘함 C7D3E6
-35. 아득함 DEDFF2
-36. 해갈감 A9D8D1
-37. 몰입 8BB5C3
-38. 집중 7EA3B2
-39. 충만함 D8E6C2
-40. 회복 9EC9A3
-41. 위안 D9EBD1
-42. 자각 B5CBE0
-43. 고요함 E4E9ED
-44. 침착함 C5D2D8
-45. 균형감 BFD7D1
-46. 흐릿함 E8E6F1
-47. 도취 E9C4B8
-48. 영감 F2E1C7
-49. 호기심 F5E2B0
-50. 상쾌함 C7E8DD
-51. 온화함 F4E6D5
-52. 차분함 DED9C9
-53. 무심함 D9D6CF
-54. 감상 A8A6C9
-55. 진정 9CB7C9
-56. 음울 8C8CA3
-57. 갈망 DDB0C4
-58. 회피 C0BBD1
-59. 포용 E3D0E3
-60. 충족감 E5E8C3
-61. 여유 E0E6D3
-62. 기대감 F9EDC2
-63. 꿈결 DED7F0
-64. 몽환 CFBCE0
-65. 무기력 E3E3E3
-66. 흐트러짐 C8C8CC
-67. 무심함 B4BABD
-68. 산뜻함 D7E9C8
-69. 뿌듯함 E7F0C9
-70. 편애 F0ECD4
-71. 감미로움 F2D7E3
-72. 기력회복 B7D6A3
-73. 포근함 F1E5E4
-74. 희미함 E6E0E2
-75. 가라앉음 B8C0C8
-76. 소진 C1BAD0
-77. 억눌림 A99EB5
-78. 허무 D5D9E0
-79. 무색 CECED0
-80. 미온 EDE2DA
-81. 관조 BDCED3
-82. 평정심 D4E0E1
-83. 해소 B9DACC
-84. 청량 E0F2EB
-85. 편유 F5F3D8
-86. 조용함 E4E8E9
-87. 온기 F2E9D5
-88. 담담 F1EFEA
-89. 완화 B7C9B6
-90. 설원감 E8EEF5
-91. 은은함 F6F6EE
-92. 명료 A8C4D4
-93. 맑음 DDEFF7
-94. 회한 D4C7D8
-95. 실소 E3C9BB
-96. 경쾌 F7EBAC
-97. 발돋움 C7D9AF
-98. 잔잔함 E2E7DB
-99. 포커스 A7B5C1
-100. 자기확신 C0D8A8
-
-──────────────────────────────
-OUTPUT FORMAT (STRICT)
-Return exactly:
-{
-  "emotion": "...",
-  "hex": "...",
-  "similarity_reason": "...",
-  "temperature_c": <number>,
-  "humidity_pct": <number>,
-  "brightness_level": <1|2|3|4|5>,
-  "music": "..."
-}
-No other text or fields are allowed.
-Never output natural language.
-Never generate emotion or color not in the list.
-If uncertain, select the closest emotion from the list.
-If input is sexual or abusive, always return 무색 (CECED0).
-`
+Quadrant targets:
+- 긍정-능동: 22.5°C / 57.5%
+- 긍정-수동: 26°C / 57.5%
+- 부정-능동: 21°C / 37.5%
+- 부정-수동: 25.5°C / 37.5%
+- Default: 24°C / 50%`
 ];
 
 export default function ModelTester() {
@@ -531,6 +147,8 @@ export default function ModelTester() {
 	const [environment, setEnvironment] = useState(null);
 	const [emotionName, setEmotionName] = useState('');
 	const [reasonText, setReasonText] = useState('');
+	const [emotionHsl, setEmotionHsl] = useState('');
+	const [emotionHslCss, setEmotionHslCss] = useState('');
 
 	// No user-edited presets; fixed set only
 
@@ -581,17 +199,37 @@ export default function ModelTester() {
 			}
 			if (!envObj) {
 				envObj = {
-					tempC: 21,
+					tempC: 24,
 					humidityPct: 50,
-					brightnessLevel: 3,
-					lightingColorHex: hx || '',
-					music: 'Life is - Scott Burkely'
+					lighting: { mode: 'temp', kelvin: 3500, brightness: 50 },
+					lightingSummary: 'TEMP 3500K; brightness 50%',
+					hsbSummary: formatHSB(deriveHSBFromLighting({ mode: 'temp', brightness: 50 }, '')),
+					music: 'life is - Scott Buckley'
 				};
 			} else {
-				if (hx && !envObj.lightingColorHex) envObj.lightingColorHex = hx;
-				if (!envObj.brightnessLevel) envObj.brightnessLevel = 3;
+				// ensure lighting object and summary
+				if (!envObj.lighting) {
+					envObj.lighting = coerceLightingFromEnv(envObj);
+				}
+				if (!envObj.lightingSummary) {
+					envObj.lightingSummary = summarizeLighting(envObj.lighting, envObj.lightingColorHex);
+				}
+				// derive or format HSB summary
+				if (!envObj.hsbSummary) {
+					const hsb =
+						(envObj.lightingHSB && (typeof envObj.lightingHSB.hue === 'number' || typeof envObj.lightingHSB.saturation === 'number' || typeof envObj.lightingHSB.brightness254 === 'number'))
+							? envObj.lightingHSB
+							: deriveHSBFromLighting(envObj.lighting, envObj.lightingColorHex);
+					envObj.hsbSummary = formatHSB(hsb);
+					if (!envObj.lightingHSB && hsb) envObj.lightingHSB = hsb;
+				}
 			}
 			setEnvironment(envObj);
+			// compute emotion HSL (positive -> same, negative -> complementary)
+			const baseHex = hx || envObj.lightingColorHex || '';
+			const hslComputed = computeEmotionHsl(hx || '', emo);
+			setEmotionHsl(hslComputed.text);
+			setEmotionHslCss(hslComputed.css);
 		} catch (err) {
 			setErrorMessage(
 				err instanceof Error ? err.message : 'Unexpected error occurred'
@@ -773,7 +411,7 @@ export default function ModelTester() {
 					</label>
 				</section>
 
-				<section className="panel section">
+				<section className="panel section resultModal">
 					<div className="sectionTitle">Result</div>
 					{errorMessage ? <div style={{ color: 'var(--danger)' }}>{errorMessage}</div> : null}
 					{colorHex && (
@@ -842,17 +480,25 @@ export default function ModelTester() {
 							</div>
 							<div
 								className="miniCard clickable"
-								title="Copy lighting color hex"
-								onClick={() => handleCopyValue(environment.lightingColorHex || '')}
+								title="Copy lighting"
+								onClick={() => handleCopyValue(environment.lightingSummary || '')}
 								role="button"
 								tabIndex={0}
-								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.lightingColorHex || ''); } }}
+								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.lightingSummary || ''); } }}
 							>
-								<div className="miniTitle">조명 컬러</div>
-								<div className="miniValue" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-									{environment.lightingColorHex ? <span className="chipDot" style={{ backgroundColor: environment.lightingColorHex }} /> : null}
-									{environment.lightingColorHex || '-'}
-								</div>
+								<div className="miniTitle">조명</div>
+								<div className="miniValue">{environment.lightingSummary || '-'}</div>
+							</div>
+							<div
+								className="miniCard clickable"
+								title="Copy lighting HSB"
+								onClick={() => handleCopyValue(environment.hsbSummary || '')}
+								role="button"
+								tabIndex={0}
+								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.hsbSummary || ''); } }}
+							>
+								<div className="miniTitle">조명 HSB</div>
+								<div className="miniValue">{environment.hsbSummary || '-'}</div>
 							</div>
 							<div
 								className="miniCard clickable"
@@ -864,6 +510,20 @@ export default function ModelTester() {
 							>
 								<div className="miniTitle">음악</div>
 								<div className="miniValue">{environment.music}</div>
+							</div>
+							<div
+								className="miniCard clickable"
+								title="Copy emotion HSL"
+								onClick={() => handleCopyValue(emotionHsl)}
+								role="button"
+								tabIndex={0}
+								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(emotionHsl); } }}
+							>
+								<div className="miniTitle">조명 HSL</div>
+								<div className="miniValue" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+									{emotionHslCss ? <span className="chipDot" style={{ backgroundColor: emotionHslCss }} /> : null}
+									{emotionHsl || '-'}
+								</div>
 							</div>
 						</div>
 					)}
@@ -944,6 +604,205 @@ function shortReason(text) {
 	return t.length > 180 ? t.slice(0, 177) + '…' : t;
 }
 
+function summarizeLighting(lighting, lightingColorHex) {
+	try {
+		if (lighting && typeof lighting === 'object') {
+			const mode = String(lighting.mode || '').toLowerCase();
+			if (mode === 'rgb') {
+				const r = lighting.r ?? null;
+				const g = lighting.g ?? null;
+				const b = lighting.b ?? null;
+				const br = typeof lighting.brightness === 'number' ? lighting.brightness : null;
+				const rgbPart =
+					[r, g, b].every((v) => typeof v === 'number')
+						? `RGB ${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}`
+						: 'RGB';
+				return br !== null ? `${rgbPart}; brightness ${Math.round(br)}%` : rgbPart;
+			}
+			if (mode === 'temp') {
+				const k = lighting.kelvin ?? null;
+				const br = typeof lighting.brightness === 'number' ? lighting.brightness : null;
+				const kPart = typeof k === 'number' ? `TEMP ${Math.round(k)}K` : 'TEMP';
+				const main = br !== null ? `${kPart}; brightness ${Math.round(br)}%` : kPart;
+				// If server provided RGB alongside TEMP, append it
+				if ([lighting.r, lighting.g, lighting.b].every((v) => typeof v === 'number')) {
+					return `${main} | RGB ${Math.round(lighting.r)}, ${Math.round(lighting.g)}, ${Math.round(lighting.b)}`;
+				}
+				return main;
+			}
+		}
+		if (lightingColorHex) return `HEX ${lightingColorHex}`;
+		return '';
+	} catch {
+		return '';
+	}
+}
+
+function formatHSB(hsb) {
+	try {
+		if (!hsb || typeof hsb !== 'object') return '';
+		const hasHue = typeof hsb.hue === 'number';
+		const hasSat = typeof hsb.saturation === 'number';
+		const hasBri = typeof hsb.brightness254 === 'number';
+		if (!hasHue && !hasSat && !hasBri) return '';
+		const parts = [];
+		if (hasHue) parts.push(`Hue ${Math.round(hsb.hue)}`);
+		if (hasSat) parts.push(`Sat ${Math.round(hsb.saturation)}`);
+		if (hasBri) parts.push(`Bri254 ${Math.round(hsb.brightness254)}`);
+		return parts.join(', ');
+	} catch {
+		return '';
+	}
+}
+
+function hexToRgbSimple(hex) {
+	if (!hex) return null;
+	let s = String(hex).trim();
+	if (s.startsWith('#')) s = s.slice(1);
+	if (s.length === 3) s = s.split('').map((c) => c + c).join('');
+	if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+	const num = parseInt(s, 16);
+	return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+}
+
+function rgbToHsvSimple(r, g, b) {
+	r /= 255; g /= 255; b /= 255;
+	const max = Math.max(r, g, b), min = Math.min(r, g, b);
+	const d = max - min;
+	let h = 0;
+	if (d !== 0) {
+		switch (max) {
+			case r: h = ((g - b) / d + (g < b ? 6 : 0)); break;
+			case g: h = (b - r) / d + 2; break;
+			case b: h = (r - g) / d + 4; break;
+		}
+		h *= 60;
+	}
+	const s = max === 0 ? 0 : d / max;
+	const v = max;
+	return { h, s, v };
+}
+
+function rgbToHslSimple(r, g, b) {
+	r /= 255; g /= 255; b /= 255;
+	const max = Math.max(r, g, b), min = Math.min(r, g, b);
+	let h = 0, s = 0;
+	const l = (max + min) / 2;
+	if (max !== min) {
+		const d = max - min;
+		s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+		switch (max) {
+			case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+			case g: h = (b - r) / d + 2; break;
+			case b: h = (r - g) / d + 4; break;
+		}
+		h *= 60;
+	}
+	return { h, s, l };
+}
+
+function emotionQuadrant(emotion) {
+	const e = String(emotion || '').trim();
+	if (!e) return 'neutral';
+	const posActive = ['놀라움', '흥분', '설렘', '활력', '흥미', '감격', '기쁨', '기대', '몰입', '집중', '회복', '자각', '도취', '영감', '호기심', '상쾌함', '기대감', '산뜻함', '뿌듯함', '기력회복', '청량', '명료', '맑음', '경쾌', '발돋움', '포커스', '자기확신'];
+	if (posActive.includes(e)) return 'positive';
+	const posPassive = ['고독', '만족', '느긋', '평온', '편안', '애틋함', '향수', '아득함', '해갈감', '충만함', '위안', '고요함', '침착함', '균형감', '온화함', '차분함', '무심함', '감상', '진정', '여유', '꿈결', '몽환', '미온', '관조', '평정심', '포용', '충족감', '해소', '편유', '조용함', '온기', '담담', '완화', '설원감', '은은함', '잔잔함'];
+	if (posPassive.includes(e)) return 'positive';
+	const negActive = ['충격', '당혹', '분노', '짜증', '경계', '긴장', '갈증'];
+	if (negActive.includes(e)) return 'negative';
+	const negPassive = ['번아웃', '피로', '실망', '후회', '무력', '공허', '심심함', '수줍음', '체념', '서늘함', '흐릿함', '음울', '회피', '무기력', '흐트러짐', '무심함 ', '희미함', '가라앉음', '소진', '억눌림', '허무', '회한', '두려움', '고독', '향수'];
+	if (negPassive.includes(e)) return 'negative';
+	return 'neutral';
+}
+
+function computeEmotionHsl(hex, emotion) {
+	try {
+		const rgb = hexToRgbSimple(hex);
+		if (!rgb) return { text: '', css: '' };
+		const q = emotionQuadrant(emotion);
+		let { h, s, l } = rgbToHslSimple(rgb.r, rgb.g, rgb.b);
+		if (q === 'negative') {
+			h = (h + 180) % 360; // complementary for negative emotions
+		}
+		// Keep S/L from the emotion palette as-is (only rotate Hue for negative),
+		// so lighting stays in the same tone family as the provided HEX palette.
+		const sPct = Math.round(s * 100);
+		const lPct = Math.round(l * 100);
+		const css = `hsl(${Math.round(h)}, ${sPct}%, ${lPct}%)`;
+		return { text: `H ${Math.round(h)}, S ${sPct}%, L ${lPct}%`, css };
+	} catch {
+		return { text: '', css: '' };
+	}
+}
+function deriveHSBFromLighting(lighting, lightingColorHex) {
+	try {
+		// Prefer explicit RGB values
+		if (lighting && lighting.mode === 'rgb') {
+			const { r, g, b, brightness } = lighting;
+			if ([r, g, b].every((v) => typeof v === 'number')) {
+				const hsv = rgbToHsvSimple(r, g, b);
+				return {
+					hue: Math.round((hsv.h / 360) * 65535),
+					saturation: Math.round(hsv.s * 254),
+					brightness254: typeof brightness === 'number'
+						? Math.round(Math.max(0, Math.min(100, brightness)) * 2.54)
+						: Math.round(hsv.v * 254)
+				};
+			}
+		}
+		// Fallback to HEX
+		if (lightingColorHex) {
+			const rgb = hexToRgbSimple(lightingColorHex);
+			if (rgb) {
+				const hsv = rgbToHsvSimple(rgb.r, rgb.g, rgb.b);
+				return {
+					hue: Math.round((hsv.h / 360) * 65535),
+					saturation: Math.round(hsv.s * 254),
+					brightness254: Math.round(hsv.v * 254)
+				};
+			}
+		}
+		// TEMP mode → treat as white: sat 0, hue arbitrary 0
+		if (lighting && lighting.mode === 'temp') {
+			const briPct = typeof lighting.brightness === 'number' ? lighting.brightness : 50;
+			return {
+				hue: 0,
+				saturation: 0,
+				brightness254: Math.round(Math.max(0, Math.min(100, briPct)) * 2.54)
+			};
+		}
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+function coerceLightingFromEnv(env) {
+	if (!env || typeof env !== 'object') return null;
+	const mode = typeof env.lightingMode === 'string' ? env.lightingMode.toLowerCase() : '';
+	if (mode === 'rgb') {
+		return {
+			mode: 'rgb',
+			r: typeof env.lightingR === 'number' ? env.lightingR : null,
+			g: typeof env.lightingG === 'number' ? env.lightingG : null,
+			b: typeof env.lightingB === 'number' ? env.lightingB : null,
+			brightness: typeof env.brightnessLevel === 'number' ? env.brightnessLevel : null
+		};
+	}
+	if (mode === 'temp') {
+		return {
+			mode: 'temp',
+			kelvin: typeof env.lightingColorTemp === 'number' ? env.lightingColorTemp : null,
+			brightness: typeof env.brightnessLevel === 'number' ? env.brightnessLevel : null,
+			// also carry RGB if available (server now fills it even in TEMP mode)
+			r: typeof env.lightingR === 'number' ? env.lightingR : null,
+			g: typeof env.lightingG === 'number' ? env.lightingG : null,
+			b: typeof env.lightingB === 'number' ? env.lightingB : null
+		};
+	}
+	return null;
+}
+
 function normalizeToFive(arr) {
 	const base = [
 		{ id: 'slot1', text: '' },
@@ -1002,13 +861,17 @@ function extractEnvFromText(text) {
 		const obj = JSON.parse(String(text));
 		if (!obj || typeof obj !== 'object') return null;
 		const toNumber = (v) => {
-			if (typeof v === 'number') return v;
-			const n = Number(String(v).replace(/[^\d.]/g, ''));
+			if (v === undefined || v === null) return null;
+			if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+			const s = String(v).trim();
+			const m = s.match(/-?\d+(\.\d+)?/);
+			if (!m) return null;
+			const n = Number(m[0]);
 			return Number.isFinite(n) ? n : null;
 		};
 		const toInt = (v) => {
 			const n = toNumber(v);
-			return Number.isFinite(n) ? Math.round(n) : null;
+			return n === null ? null : Math.round(n);
 		};
 		const normalizeHex = (h) => {
 			if (!h) return '';
@@ -1019,17 +882,17 @@ function extractEnvFromText(text) {
 			return '';
 		};
 		const tempC =
-			toNumber(obj.temperature_c) ??
+			toNumber(obj.temperature_celsius) ??
 			toNumber(obj.temp_c) ??
 			toNumber(obj.tempC) ??
 			null;
 		const humidityPct =
-			toNumber(obj.humidity_pct) ??
+			toNumber(obj.humidity_percent) ??
 			toNumber(obj.humidity) ??
 			toNumber(obj.humidityPct) ??
 			null;
 		const brightnessLevel =
-			toInt(obj.brightness_level) ??
+			toInt(obj.lighting_brightness) ??
 			toInt(obj.brightness) ??
 			null;
 		const illuminanceLux =
@@ -1041,19 +904,57 @@ function extractEnvFromText(text) {
 			normalizeHex(obj.lighting_color) ||
 			'';
 		const music =
-			typeof obj.music === 'string'
-				? obj.music
+			typeof obj.music_title === 'string'
+				? `${obj.music_title} - ${obj.music_artist || ''}`
 				: typeof obj.music_recommendation === 'string'
 				? obj.music_recommendation
 				: '';
-		if (tempC !== null || humidityPct !== null || brightnessLevel !== null || illuminanceLux !== null || lightingColorHex || music) {
+		const lightingMode =
+			typeof obj.lighting_mode === 'string'
+				? obj.lighting_mode.toLowerCase()
+				: null;
+		// Parse channel values regardless of mode so we can show RGB alongside TEMP
+		let lightingR = toInt(obj.lighting_r);
+		let lightingG = toInt(obj.lighting_g);
+		let lightingB = toInt(obj.lighting_b);
+		let lightingColorTemp =
+			toNumber(obj.lighting_color_temp) ??
+			toNumber(obj.lighting_kelvin) ??
+			null;
+		// HSB style fields
+		const lightingHue = toInt(obj.lighting_hue);
+		const lightingSaturation254 = toInt(obj.lighting_saturation);
+		const lightingBrightness254 = toInt(obj.lighting_brightness_254);
+		// Parse "lighting_rgb": "r, g, b" if provided and per-channel values are missing
+		if (lightingR === null || lightingG === null || lightingB === null) {
+			if (typeof obj.lighting_rgb === 'string') {
+				const parts = obj.lighting_rgb.split(',').map((x) => toInt(x));
+				if (parts.length >= 3) {
+					if (lightingR === null) lightingR = parts[0];
+					if (lightingG === null) lightingG = parts[1];
+					if (lightingB === null) lightingB = parts[2];
+				}
+			}
+		}
+
+		if (tempC !== null || humidityPct !== null || brightnessLevel !== null || illuminanceLux !== null || lightingColorHex || music || lightingMode || lightingR !== null || lightingG !== null || lightingB !== null || lightingColorTemp !== null || lightingHue !== null || lightingSaturation254 !== null || lightingBrightness254 !== null) {
 			return {
 				tempC: tempC ?? 21,
 				humidityPct: humidityPct ?? 50,
 				brightnessLevel: brightnessLevel ?? 3,
 				illuminanceLux: illuminanceLux ?? null,
 				lightingColorHex: lightingColorHex || '',
-				music: music || 'ambient'
+				music: music || 'ambient',
+				lightingMode: lightingMode || null,
+				lightingR: lightingR ?? null,
+				lightingG: lightingG ?? null,
+				lightingB: lightingB ?? null,
+				lightingColorTemp: lightingColorTemp ?? null,
+				lightingHSB: {
+					hue: lightingHue ?? null,
+					saturation: lightingSaturation254 ?? null,
+					brightness254: lightingBrightness254 ?? null
+				}
 			};
 		}
 		return null;

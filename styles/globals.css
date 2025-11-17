@@ -7,6 +7,9 @@
 	--border: #1f2937;
 	--accent: #7c3aed;
 	--danger: #ef4444;
+	--container-padding: 24px;
+	--container-max: 980px;
+	--header-h: 64px;
 }
 
 * {
@@ -37,9 +40,9 @@ a {
 }
 
 .container {
-	max-width: 980px;
+	max-width: var(--container-max);
 	margin: 0 auto;
-	padding: 24px;
+	padding: var(--container-padding);
 	height: 100vh;
 	overflow: hidden;
 	display: flex;
@@ -51,6 +54,7 @@ a {
 	align-items: center;
 	justify-content: space-between;
 	padding: 16px 0 24px 0;
+	min-height: var(--header-h);
 }
 
 .title {
@@ -404,7 +408,7 @@ a {
 
 .miniGrid {
 	display: grid;
-	grid-template-columns: repeat(4, 1fr);
+	grid-template-columns: repeat(5, 1fr);
 	gap: 8px;
 	margin-top: 8px;
 }
@@ -433,6 +437,30 @@ a {
 @media (max-width: 900px) {
 	.miniGrid {
 		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+.resultModal {
+	position: fixed;
+	/* keep at least 24px from viewport edge, but align with container (980px max) margin on wide screens */
+	right: max(var(--container-padding), calc((100vw - var(--container-max)) / 2 + var(--container-padding)));
+	top: calc(var(--container-padding) + var(--header-h));
+	/* match one grid column width: (container content width - gap) / 2 */
+	width: calc((min(var(--container-max), 100vw) - (var(--container-padding) * 2) - 16px) / 2);
+	max-width: none;
+	/* exact match to left panel (container height minus header and paddings) */
+	height: calc(100vh - (var(--container-padding) * 2) - var(--header-h));
+	overflow: auto;
+	z-index: 20;
+}
+
+@media (max-width: 900px) {
+	.resultModal {
+		right: 12px;
+		top: 12px;
+		width: calc(100vw - 24px);
+		max-width: none;
+		height: calc(100vh - 24px);
 	}
 }
 

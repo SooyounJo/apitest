@@ -271,6 +271,30 @@ function parseComfortCues(text) {
 }
 
 function ensureEnvironmentFields(obj, userPrompt) {
+	// If new schema is detected, enforce and auto-fill its fields
+	if (
+		obj &&
+		typeof obj === 'object' &&
+		(
+			'temperature_celsius' in obj ||
+			'humidity_percent' in obj ||
+			'music_title' in obj ||
+			'music_artist' in obj ||
+			'lighting_mode' in obj ||
+			'lighting_rgb' in obj ||
+			'lighting_r' in obj ||
+			'lighting_g' in obj ||
+			'lighting_b' in obj ||
+			'lighting_kelvin' in obj ||
+			'lighting_color_temp' in obj ||
+			'lighting_hue' in obj ||
+			'lighting_saturation' in obj ||
+			'lighting_brightness_254' in obj
+		)
+	) {
+		return ensureNewSchemaFields(obj, userPrompt);
+	}
+
 	const payload = { ...obj };
 	let repaired = false;
 	// emotion/hex should exist already; if not, leave for frontend
@@ -519,6 +543,198 @@ function adjustLightingHex(baseHex, opts = {}) {
 	} catch {
 		return baseHex;
 	}
+}
+
+function rgbToHsv(r, g, b) {
+	r /= 255; g /= 255; b /= 255;
+	const max = Math.max(r, g, b), min = Math.min(r, g, b);
+	const d = max - min;
+	let h = 0;
+	if (d !== 0) {
+		switch (max) {
+			case r: h = ((g - b) / d + (g < b ? 6 : 0)); break;
+			case g: h = (b - r) / d + 2; break;
+			case b: h = (r - g) / d + 4; break;
+		}
+		h *= 60;
+	}
+	const s = max === 0 ? 0 : d / max;
+	const v = max;
+	return { h, s, v };
+}
+
+function clamp(v, min, max) {
+	if (!Number.isFinite(v)) return min;
+	return Math.max(min, Math.min(max, v));
+}
+
+function deriveEmotionRgbFromHex(baseHex, quadrant) {
+	try {
+		const hex = typeof baseHex === 'string' && baseHex ? baseHex : '#FFFFFF';
+		const { r, g, b } = hexToRgb(hex);
+		let { h, s, l } = rgbToHsl(r, g, b);
+		const isNeg = quadrant === 'neg_active' || quadrant === 'neg_passive';
+		if (isNeg) h = (h + 180) % 360;
+		const out = hslToRgb(h, s, l);
+		return { r: Math.round(out.r), g: Math.round(out.g), b: Math.round(out.b) };
+	} catch {
+		return { r: 220, g: 200, b: 180 };
+	}
+}
+
+function kelvinToRgb(k) {
+	let temp = Number(k);
+	if (!Number.isFinite(temp)) return { r: 255, g: 244, b: 229 };
+	temp = Math.max(1000, Math.min(40000, temp)) / 100;
+	let red, green, blue;
+	if (temp <= 66) {
+		red = 255;
+		green = 99.4708025861 * Math.log(temp) - 161.1195681661;
+		if (temp <= 19) {
+			blue = 0;
+		} else {
+			blue = 138.5177312231 * Math.log(temp - 10) - 305.0447927307;
+		}
+	} else {
+		red = 329.698727446 * Math.pow(temp - 60, -0.1332047592);
+		green = 288.1221695283 * Math.pow(temp - 60, -0.0755148492);
+		blue = 255;
+	}
+	const to = (v) => Math.max(0, Math.min(255, Math.round(v)));
+	return { r: to(red), g: to(green), b: to(blue) };
+}
+
+// ---------- New-schema enforcement (temperature_celsius, humidity_percent, music_title/artist, lighting_* ) ----------
+const QUADRANT_TARGETS = {
+	'pos_active': { temp: 22.5, humid: 57.5, mode: 'rgb', rgb: [255, 220, 180], kelvin: 3500, brightness: 90 },
+	'pos_passive': { temp: 26.0, humid: 57.5, mode: 'temp', kelvin: 3000, brightness: 45 },
+	'neg_active': { temp: 21.0, humid: 37.5, mode: 'temp', kelvin: 4000, brightness: 50 },
+	'neg_passive': { temp: 25.5, humid: 37.5, mode: 'temp', kelvin: 3000, brightness: 80 },
+	'default': { temp: 24.0, humid: 50.0, mode: 'temp', kelvin: 3500, brightness: 50 }
+};
+
+const MUSIC_LIBRARY_BY_QUADRANT = {
+	'pos_passive': [
+		{ title: 'life is', artist: 'Scott Buckley' },
+		{ title: 'Glow', artist: 'Scott Buckley' },
+		{ title: 'Clean Soul - Calming', artist: 'Kevin MacLeod' },
+		{ title: 'Solace', artist: 'Scott Buckley' }
+	],
+	'pos_active': [
+		{ title: 'happy stroll', artist: '331music' },
+		{ title: 'Ukulele Dance', artist: 'Derek Fiechter & Brandon Fiechter' },
+		{ title: 'Happy Alley', artist: 'Kevin MacLeod' },
+		{ title: 'sunny side up', artist: 'Victor Lundberg' }
+	],
+	'neg_passive': [
+		{ title: 'solstice', artist: 'Scott Buckley' },
+		{ title: 'Amberlight', artist: 'Scott Buckley' },
+		{ title: 'Borealis', artist: 'Scott Buckley' },
+		{ title: 'A Kind Of Hope', artist: 'Scott Buckley' }
+	],
+	'neg_active': [
+		{ title: 'New Beginnings', artist: 'Tokyo Music Walker' },
+		{ title: 'the travelling symphony', artist: 'Savfk' },
+		{ title: 'Echoes', artist: 'Scott Buckley' },
+		{ title: 'Shoulders Of Giants', artist: 'Scott Buckley' }
+	]
+};
+
+function quadrantForEmotion(emotion) {
+	const e = String(emotion || '').trim();
+	if (!e) return 'default';
+	const posActive = ['놀라움', '흥분', '설렘', '활력', '흥미', '감격', '기쁨', '기대', '몰입', '집중', '회복', '자각', '도취', '영감', '호기심', '상쾌함', '기대감', '산뜻함', '뿌듯함', '기력회복', '청량', '명료', '맑음', '경쾌', '발돋움', '포커스', '자기확신'];
+	if (posActive.includes(e)) return 'pos_active';
+	const posPassive = ['고독', '만족', '느긋', '평온', '편안', '애틋함', '향수', '아득함', '해갈감', '충만함', '위안', '고요함', '침착함', '균형감', '온화함', '차분함', '무심함', '감상', '진정', '여유', '꿈결', '몽환', '미온', '관조', '평정심', '포용', '충족감', '해소', '편유', '조용함', '온기', '담담', '완화', '설원감', '은은함', '잔잔함'];
+	if (posPassive.includes(e)) return 'pos_passive';
+	const negActive = ['충격', '당혹', '분노', '짜증', '경계', '긴장', '갈증'];
+	if (negActive.includes(e)) return 'neg_active';
+	const negPassive = ['번아웃', '피로', '실망', '후회', '무력', '공허', '심심함', '수줍음', '체념', '서늘함', '흐릿함', '음울', '회피', '무기력', '흐트러짐', '무심함 ', '희미함', '가라앉음', '소진', '억눌림', '허무', '회한', '두려움', '고독', '향수'];
+	if (negPassive.includes(e)) return 'neg_passive';
+	return 'default';
+}
+
+function chooseMusicForQuadrant(quadrant, seed) {
+	const list = MUSIC_LIBRARY_BY_QUADRANT[quadrant] || MUSIC_LIBRARY_BY_QUADRANT['pos_passive'];
+	const idx = hashStr(seed || '') % list.length;
+	return list[idx];
+}
+
+function ensureNewSchemaFields(obj, userPrompt) {
+	const p = { ...obj };
+	let repaired = false;
+
+	// Quadrant selection for targets
+	const q = quadrantForEmotion(p.emotion);
+	const targets = QUADRANT_TARGETS[q] || QUADRANT_TARGETS['default'];
+
+	// Temperature / humidity
+	if (typeof p.temperature_celsius !== 'number') {
+		p.temperature_celsius = targets.temp;
+		repaired = true;
+	}
+	if (typeof p.humidity_percent !== 'number') {
+		p.humidity_percent = targets.humid;
+		repaired = true;
+	}
+
+	// Music
+	if (!p.music_title || !p.music_artist) {
+		const pick = chooseMusicForQuadrant(q, (userPrompt || '') + (p.emotion || ''));
+		p.music_title = pick.title;
+		p.music_artist = pick.artist;
+		repaired = true;
+	}
+
+	// Lighting
+	const mode = String(p.lighting_mode || targets.mode || 'temp').toLowerCase();
+	p.lighting_mode = mode === 'rgb' || mode === 'temp' ? mode : 'temp';
+	const emotionRgb = deriveEmotionRgbFromHex(p.hex, q);
+
+	if (p.lighting_mode === 'rgb') {
+		// Force rule: positive -> emotion color, negative -> complementary
+		p.lighting_r = clamp(emotionRgb.r, 0, 255);
+		p.lighting_g = clamp(emotionRgb.g, 0, 255);
+		p.lighting_b = clamp(emotionRgb.b, 0, 255);
+		p.lighting_rgb = `${p.lighting_r}, ${p.lighting_g}, ${p.lighting_b}`;
+		// brightness 0-100
+		let br = Number(p.lighting_brightness);
+		if (!Number.isFinite(br)) {
+			br = targets.brightness;
+			repaired = true;
+		}
+		p.lighting_brightness = clamp(br, 0, 100);
+		// HSB from RGB
+		const hsv = rgbToHsv(p.lighting_r, p.lighting_g, p.lighting_b);
+		p.lighting_hue = Math.round((hsv.h / 360) * 65535);
+		p.lighting_saturation = Math.round(hsv.s * 254);
+		p.lighting_brightness_254 = Math.round(clamp(p.lighting_brightness, 0, 100) * 2.54);
+	} else {
+		// temp mode
+		let k = Number(p.lighting_kelvin ?? p.lighting_color_temp);
+		if (!Number.isFinite(k)) {
+			k = targets.kelvin;
+			repaired = true;
+		}
+		p.lighting_kelvin = clamp(k, 2200, 6500);
+		let br = Number(p.lighting_brightness);
+		if (!Number.isFinite(br)) {
+			br = targets.brightness;
+			repaired = true;
+		}
+		p.lighting_brightness = clamp(br, 0, 100);
+		// Provide RGB strictly from emotion/complement rule
+		p.lighting_r = clamp(emotionRgb.r, 0, 255);
+		p.lighting_g = clamp(emotionRgb.g, 0, 255);
+		p.lighting_b = clamp(emotionRgb.b, 0, 255);
+		p.lighting_rgb = `${p.lighting_r}, ${p.lighting_g}, ${p.lighting_b}`;
+		// HSB for white temp: no color (sat 0), hue 0
+		p.lighting_hue = 0;
+		p.lighting_saturation = 0;
+		p.lighting_brightness_254 = Math.round(clamp(p.lighting_brightness, 0, 100) * 2.54);
+	}
+
+	return { payload: p, repaired };
 }
 
 function shouldFetchSeoulWeather(text) {
