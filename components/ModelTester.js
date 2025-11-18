@@ -385,6 +385,61 @@ export default function ModelTester() {
 						</>
 					)}
 
+					{tokenUsage && (
+						<div className="miniGrid" style={{ marginTop: 8 }}>
+							<div
+								className="miniCard clickable"
+								title="Copy input tokens"
+								onClick={() => handleCopyValue(String(tokenUsage.prompt_tokens ?? 0))}
+								role="button"
+								tabIndex={0}
+								onKeyDown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										handleCopyValue(String(tokenUsage.prompt_tokens ?? 0));
+									}
+								}}
+							>
+								<div className="miniTitle">입력 토큰</div>
+								<div className="miniValue">{tokenUsage.prompt_tokens ?? 0}</div>
+							</div>
+							<div
+								className="miniCard clickable"
+								title="Copy output tokens"
+								onClick={() => handleCopyValue(String(tokenUsage.completion_tokens ?? 0))}
+								role="button"
+								tabIndex={0}
+								onKeyDown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										handleCopyValue(String(tokenUsage.completion_tokens ?? 0));
+									}
+								}}
+							>
+								<div className="miniTitle">출력 토큰</div>
+								<div className="miniValue">{tokenUsage.completion_tokens ?? 0}</div>
+							</div>
+							<div
+								className="miniCard clickable"
+								title="Copy total tokens"
+								onClick={() => handleCopyValue(String(tokenUsage.total_tokens ?? ((tokenUsage.prompt_tokens ?? 0) + (tokenUsage.completion_tokens ?? 0))))}
+								role="button"
+								tabIndex={0}
+								onKeyDown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										handleCopyValue(String(tokenUsage.total_tokens ?? ((tokenUsage.prompt_tokens ?? 0) + (tokenUsage.completion_tokens ?? 0))));
+									}
+								}}
+							>
+								<div className="miniTitle">총합 토큰</div>
+								<div className="miniValue">
+									{tokenUsage.total_tokens ?? ((tokenUsage.prompt_tokens ?? 0) + (tokenUsage.completion_tokens ?? 0))}
+								</div>
+							</div>
+						</div>
+					)}
+
 					<div className="card" style={{ marginTop: 8 }}>
 						<div className="cardTitle">Raw JSON</div>
 						<pre className="codeBlock">{outputText}</pre>
@@ -692,6 +747,17 @@ function getEnvironmentForEmotion(emotion) {
 		if (p.match.includes(e)) return p.value;
 	}
 	return { tempC: 21, humidityPct: 50, brightnessLevel: 3, lightingColorHex: '', music: 'Life is - Scott Burkely' };
+}
+
+function formatTokenUsage(usage) {
+	try {
+		const p = Number(usage?.prompt_tokens) || 0;
+		const c = Number(usage?.completion_tokens) || 0;
+		const t = Number(usage?.total_tokens) || p + c;
+		return `Tokens: ${t} (입력 ${p} / 출력 ${c})`;
+	} catch {
+		return '';
+	}
 }
 
 
