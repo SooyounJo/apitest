@@ -464,5 +464,18 @@ a {
 	}
 }
 
+.codeBlock {
+	white-space: pre-wrap;
+	word-break: break-word;
+	overflow-x: auto;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+		"Liberation Mono", "Courier New", monospace;
+	line-height: 1.55;
+	background: #0b1220;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 10px 12px;
+}
+
 
 
