@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import prompt1 from '../prompts/1';
 import prompt2 from '../prompts/2';
-import brain from '../prompts/brain';
 import { computeEmotionHsl } from '../prompts/color';
 
 const DEFAULT_MODELS = [
@@ -17,7 +16,7 @@ const FIXED_PRESETS = [prompt1, prompt2];
 export default function ModelTester() {
 	const [selectedModel, setSelectedModel] = useState(DEFAULT_MODELS[0].id);
 	const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
-	const [systemPrompt, setSystemPrompt] = useState(`${brain}\n\n${FIXED_PRESETS[0]}`);
+	const [systemPrompt, setSystemPrompt] = useState(`${FIXED_PRESETS[0]}`);
 	const [userPrompt, setUserPrompt] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 	const [outputText, setOutputText] = useState('');
@@ -137,7 +136,7 @@ export default function ModelTester() {
 	const handleSelectSlot = useCallback(
 		(index) => {
 			const text = FIXED_PRESETS[index] || '';
-			setSystemPrompt(`${brain}\n\n${text}`);
+			setSystemPrompt(`${text}`);
 			setSelectedPresetIndex(index);
 			setCopyMessage('');
 			setStatusMessage(`슬롯 ${index + 1} 불러옴`);
@@ -339,7 +338,21 @@ export default function ModelTester() {
 									onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.lightingSummary || ''); } }}
 								>
 									<div className="miniTitle">조명</div>
-									<div className="miniValue">{environment.lightingSummary || '-'}</div>
+									<div className="miniValue">
+										<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+											{(typeof environment?.lighting?.r === 'number' &&
+												typeof environment?.lighting?.g === 'number' &&
+												typeof environment?.lighting?.b === 'number') ? (
+												<span
+													className="chipDot"
+													style={{
+														backgroundColor: `rgb(${Math.round(environment.lighting.r)}, ${Math.round(environment.lighting.g)}, ${Math.round(environment.lighting.b)})`
+													}}
+												/>
+											) : null}
+											<span>{environment.lightingSummary || '-'}</span>
+										</div>
+									</div>
 								</div>
 								
 								<div
@@ -509,7 +522,16 @@ function summarizeLighting(lighting, lightingColorHex) {
 
 function coerceLightingFromEnv(env) {
 	if (!env || typeof env !== 'object') return null;
-	const mode = typeof env.lightingMode === 'string' ? env.lightingMode.toLowerCase() : '';
+	let mode = typeof env.lightingMode === 'string' ? env.lightingMode.toLowerCase() : '';
+	if (!mode) {
+		const hasTemp = typeof env.lightingColorTemp === 'number';
+		const hasRgb =
+			typeof env.lightingR === 'number' &&
+			typeof env.lightingG === 'number' &&
+			typeof env.lightingB === 'number';
+		if (hasTemp) mode = 'temp';
+		else if (hasRgb) mode = 'rgb';
+	}
 	if (mode === 'rgb') {
 		return {
 			mode: 'rgb',
@@ -633,6 +655,7 @@ function extractEnvFromText(text) {
 		let lightingColorTemp =
 			toNumber(obj.lighting_color_temp) ??
 			toNumber(obj.lighting_kelvin) ??
+			toNumber(obj.lighting_temp_k) ??
 			null;
 		const lightingHue = toInt(obj.lighting_hue);
 		const lightingSaturation254 = toInt(obj.lighting_saturation);

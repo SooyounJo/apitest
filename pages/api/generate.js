@@ -25,14 +25,6 @@ export default async function handler(req, res) {
 		}
 
 		let extraContext = null;
-		if (shouldFetchSeoulWeather(String(prompt))) {
-			try {
-				const weather = await getSeoulWeather();
-				if (typeof weather?.temperature === 'number') {
-					extraContext = `Context: As of ${weather.time ?? 'now'} (Asia/Seoul), current temperature in Seoul is ${weather.temperature}°C.`;
-				}
-			} catch {}
-		}
 
 		const messages = [
 			system ? { role: 'system', content: String(system) } : null,
@@ -77,56 +69,11 @@ export default async function handler(req, res) {
 			  }
 			: null;
 
-		// Enforce presence of environment fields; repair if missing
+		// Pass-through model JSON; only pretty-print if parsable. Disable server-side repairs for now.
 		try {
 			const parsed = JSON.parse(output);
-			const ensured = ensureEnvironmentFields(parsed, prompt);
-			if (ensured.repaired) {
-				output = JSON.stringify(ensured.payload, null, 2);
-			}
-		} catch {
-			// Not JSON — attempt a quick repair round-trip
-			const repairMessages = [
-				{
-					role: 'system',
-					content:
-						'You repair assistant outputs into strict JSON with keys: emotion, hex, similarity_reason, temperature_c, humidity_pct, brightness_level, music. Use only allowed values. No extra fields or narration.'
-				},
-				{
-					role: 'user',
-					content: JSON.stringify({
-						current_output: output,
-						allowed: {
-							temperature_c: [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
-							humidity_pct: [30, 35, 40, 45, 50, 55, 60, 65, 70],
-							brightness_level: [1, 2, 3, 4, 5],
-							music: MUSIC_LIST
-						}
-					})
-				}
-			];
-			try {
-				const repairResp = await fetch(`${baseUrl}/chat/completions`, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						Authorization: `Bearer ${apiKey}`
-					},
-					body: JSON.stringify({
-						model,
-						messages: repairMessages,
-						response_format: { type: 'json_object' }
-					})
-				});
-				if (repairResp.ok) {
-					const rd = await repairResp.json();
-					const repairedText =
-						rd?.choices?.[0]?.message?.content ?? rd?.choices?.[0]?.text ?? '';
-					const ensured = ensureEnvironmentFields(JSON.parse(repairedText), prompt);
-					output = JSON.stringify(ensured.payload, null, 2);
-				}
-			} catch {}
-		}
+			output = JSON.stringify(parsed, null, 2);
+		} catch {}
 
 		return res.status(200).json({ output, usage, raw: data });
 	} catch (err) {
