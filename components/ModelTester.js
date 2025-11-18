@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import prompt1 from '../prompts/1';
 import prompt2 from '../prompts/2';
 import brain from '../prompts/brain';
-import { computeEmotionHsl, deriveHSBFromLighting } from '../prompts/color';
+import { computeEmotionHsl } from '../prompts/color';
 
 const DEFAULT_MODELS = [
 	{ id: 'gpt-4o', label: 'gpt-4o (smarter)' },
@@ -82,12 +82,11 @@ export default function ModelTester() {
 				envObj = getEnvironmentForEmotion(emo);
 			}
 			if (!envObj) {
-				envObj = {
+					envObj = {
 					tempC: 24,
 					humidityPct: 50,
 					lighting: { mode: 'temp', kelvin: 3500, brightness: 50 },
 					lightingSummary: 'TEMP 3500K; brightness 50%',
-					hsbSummary: formatHSB(deriveHSBFromLighting({ mode: 'temp', brightness: 50 }, '')),
 					music: 'life is - Scott Buckley'
 				};
 			} else {
@@ -97,14 +96,7 @@ export default function ModelTester() {
 				if (!envObj.lightingSummary) {
 					envObj.lightingSummary = summarizeLighting(envObj.lighting, envObj.lightingColorHex);
 				}
-				if (!envObj.hsbSummary) {
-					const hsb =
-						(envObj.lightingHSB && (typeof envObj.lightingHSB.hue === 'number' || typeof envObj.lightingHSB.saturation === 'number' || typeof envObj.lightingHSB.brightness254 === 'number'))
-							? envObj.lightingHSB
-							: deriveHSBFromLighting(envObj.lighting, envObj.lightingColorHex);
-					envObj.hsbSummary = formatHSB(hsb);
-					if (!envObj.lightingHSB && hsb) envObj.lightingHSB = hsb;
-				}
+				
 			}
 			setEnvironment(envObj);
 
@@ -349,17 +341,7 @@ export default function ModelTester() {
 									<div className="miniTitle">조명</div>
 									<div className="miniValue">{environment.lightingSummary || '-'}</div>
 								</div>
-								<div
-									className="miniCard clickable"
-									title="Copy lighting HSB"
-									onClick={() => handleCopyValue(environment.hsbSummary || '')}
-									role="button"
-									tabIndex={0}
-									onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.hsbSummary || ''); } }}
-								>
-									<div className="miniTitle">조명 HSB</div>
-									<div className="miniValue">{environment.hsbSummary || '-'}</div>
-								</div>
+								
 								<div
 									className="miniCard clickable"
 									title="Copy music"
@@ -523,22 +505,7 @@ function summarizeLighting(lighting, lightingColorHex) {
 	}
 }
 
-function formatHSB(hsb) {
-	try {
-		if (!hsb || typeof hsb !== 'object') return '';
-		const hasHue = typeof hsb.hue === 'number';
-		const hasSat = typeof hsb.saturation === 'number';
-		const hasBri = typeof hsb.brightness254 === 'number';
-		if (!hasHue && !hasSat && !hasBri) return '';
-		const parts = [];
-		if (hasHue) parts.push(`Hue ${Math.round(hsb.hue)}`);
-		if (hasSat) parts.push(`Sat ${Math.round(hsb.saturation)}`);
-		if (hasBri) parts.push(`Bri254 ${Math.round(hsb.brightness254)}`);
-		return parts.join(', ');
-	} catch {
-		return '';
-	}
-}
+
 
 function coerceLightingFromEnv(env) {
 	if (!env || typeof env !== 'object') return null;
