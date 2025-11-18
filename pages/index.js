@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import dynamic from 'next/dynamic';
 
-const ModelTester = dynamic(() => import('../components/ModelTester'), {
+const ModelTester = dynamic(() => import('../components/ui'), {
 	ssr: false
 });
 
@@ -20,5 +20,3 @@ export default function HomePage() {
 		</>
 	);
 }
-
-

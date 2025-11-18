@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import prompt1 from '../prompts/1';
 import prompt2 from '../prompts/2';
+import brain from '../prompts/brain';
+import { computeEmotionHsl, deriveHSBFromLighting } from '../prompts/color';
 
 const DEFAULT_MODELS = [
 	{ id: 'gpt-4o', label: 'gpt-4o (smarter)' },
@@ -15,24 +17,22 @@ const FIXED_PRESETS = [prompt1, prompt2];
 export default function ModelTester() {
 	const [selectedModel, setSelectedModel] = useState(DEFAULT_MODELS[0].id);
 	const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
-	const [systemPrompt, setSystemPrompt] = useState(FIXED_PRESETS[0]);
+	const [systemPrompt, setSystemPrompt] = useState(`${brain}\n\n${FIXED_PRESETS[0]}`);
 	const [userPrompt, setUserPrompt] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 	const [outputText, setOutputText] = useState('');
 	const [errorMessage, setErrorMessage] = useState('');
 	const [tokenUsage, setTokenUsage] = useState(null);
-	const [isCopying, setIsCopying] = useState(false);
 	const [copyMessage, setCopyMessage] = useState('');
 	const [statusMessage, setStatusMessage] = useState('');
 	const [isPresetExpanded, setIsPresetExpanded] = useState(false);
+
 	const [colorHex, setColorHex] = useState('');
 	const [environment, setEnvironment] = useState(null);
 	const [emotionName, setEmotionName] = useState('');
 	const [reasonText, setReasonText] = useState('');
 	const [emotionHsl, setEmotionHsl] = useState('');
 	const [emotionHslCss, setEmotionHslCss] = useState('');
-
-	// No user-edited presets; fixed set only
 
 	const isSubmitDisabled = useMemo(() => {
 		return isLoading || userPrompt.trim().length === 0;
@@ -69,12 +69,14 @@ export default function ModelTester() {
 			setOutputText(result.output || '');
 			setTokenUsage(result.usage || null);
 			const rawText = result.output || '';
+
 			const hx = extractHexFromText(rawText);
 			if (hx) setColorHex(hx);
 			const emo = extractEmotionFromText(rawText);
 			if (emo) setEmotionName(emo);
 			const reason = extractReasonFromText(rawText);
 			if (reason) setReasonText(reason);
+
 			let envObj = extractEnvFromText(rawText);
 			if (!envObj && emo) {
 				envObj = getEnvironmentForEmotion(emo);
@@ -89,14 +91,12 @@ export default function ModelTester() {
 					music: 'life is - Scott Buckley'
 				};
 			} else {
-				// ensure lighting object and summary
 				if (!envObj.lighting) {
 					envObj.lighting = coerceLightingFromEnv(envObj);
 				}
 				if (!envObj.lightingSummary) {
 					envObj.lightingSummary = summarizeLighting(envObj.lighting, envObj.lightingColorHex);
 				}
-				// derive or format HSB summary
 				if (!envObj.hsbSummary) {
 					const hsb =
 						(envObj.lightingHSB && (typeof envObj.lightingHSB.hue === 'number' || typeof envObj.lightingHSB.saturation === 'number' || typeof envObj.lightingHSB.brightness254 === 'number'))
@@ -107,8 +107,7 @@ export default function ModelTester() {
 				}
 			}
 			setEnvironment(envObj);
-			// compute emotion HSL (positive -> same, negative -> complementary)
-			const baseHex = hx || envObj.lightingColorHex || '';
+
 			const hslComputed = computeEmotionHsl(hx || '', emo);
 			setEmotionHsl(hslComputed.text);
 			setEmotionHslCss(hslComputed.css);
@@ -143,19 +142,10 @@ export default function ModelTester() {
 		[handleGenerate, isSubmitDisabled]
 	);
 
-	const handleClear = useCallback(() => {
-		setUserPrompt('');
-		setOutputText('');
-		setErrorMessage('');
-		setTokenUsage(null);
-		setCopyMessage('');
-		setStatusMessage('');
-	}, []);
-
 	const handleSelectSlot = useCallback(
 		(index) => {
 			const text = FIXED_PRESETS[index] || '';
-			setSystemPrompt(text);
+			setSystemPrompt(`${brain}\n\n${text}`);
 			setSelectedPresetIndex(index);
 			setCopyMessage('');
 			setStatusMessage(`슬롯 ${index + 1} 불러옴`);
@@ -163,19 +153,7 @@ export default function ModelTester() {
 		[]
 	);
 
-	const handleCopyPromptResult = useCallback(async () => {
-		setCopyMessage('');
-		setIsCopying(true);
-		try {
-			const content = `Prompt:\n${String(userPrompt || '')}\n\nResult:\n${String(outputText || '')}`;
-			await copyToClipboard(content);
-			setCopyMessage('Copied prompt and result');
-		} catch (err) {
-			setCopyMessage('Copy failed');
-		} finally {
-			setIsCopying(false);
-		}
-	}, [outputText, userPrompt]);
+	// Removed: explicit "프롬프트+결과 copy" button handler
 
 	const handleCopyValue = useCallback(async (value) => {
 		try {
@@ -188,7 +166,6 @@ export default function ModelTester() {
 	}, []);
 
 	const handleResetAll = useCallback(() => {
-		// Keep current system prompt, preset selection, model, and label as-is.
 		setUserPrompt('');
 		setOutputText('');
 		setErrorMessage('');
@@ -259,7 +236,7 @@ export default function ModelTester() {
 								</button>
 							</div>
 						</div>
-						{/* Compose prompt */}
+
 						<div className="sectionTitle" style={{ marginTop: 12 }}>Prompt</div>
 						<textarea
 							className="textarea textareaPrompt"
@@ -272,15 +249,7 @@ export default function ModelTester() {
 							<button className="button" type="submit" disabled={isSubmitDisabled}>
 								{isLoading ? 'Generating…' : 'Generate'}
 							</button>
-							<button
-								type="button"
-								className="button buttonSecondary"
-								onClick={handleCopyPromptResult}
-								disabled={isCopying || (!userPrompt.trim() && !String(outputText || '').trim())}
-								title="프롬프트와 결과를 클립보드로 복사"
-							>
-								{isCopying ? 'Copying…' : '프롬프트+결과 copy'}
-							</button>
+							{/* Copy prompt+result button removed per request */}
 							<button
 								type="button"
 								className="button buttonDanger"
@@ -290,6 +259,8 @@ export default function ModelTester() {
 								다시 시작
 							</button>
 						</div>
+						{statusMessage ? <div className="footerNote" style={{ marginTop: 8 }}>{statusMessage}</div> : null}
+						{copyMessage ? <div className="footerNote" style={{ marginTop: 4 }}>{copyMessage}</div> : null}
 					</label>
 				</section>
 
@@ -305,9 +276,9 @@ export default function ModelTester() {
 							tabIndex={0}
 							onKeyDown={(e) => {
 								if (e.key === 'Enter' || e.key === ' ') {
-									e.preventDefault();
-									handleCopyValue(colorHex);
-								}
+                                    e.preventDefault();
+                                    handleCopyValue(colorHex);
+                                }
 							}}
 						>
 							<span className="colorDot" style={{ backgroundColor: colorHex }} />
@@ -336,103 +307,90 @@ export default function ModelTester() {
 							</div>
 						</div>
 					)}
-					{environment && (
-						<div className="miniGrid">
-							<div
-								className="miniCard clickable"
-								title="Copy temperature"
-								onClick={() => handleCopyValue(`${environment.tempC}°C`)}
-								role="button"
-								tabIndex={0}
-								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(`${environment.tempC}°C`); } }}
-							>
-								<div className="miniTitle">온도</div>
-								<div className="miniValue">{environment.tempC}°C</div>
-							</div>
-							<div
-								className="miniCard clickable"
-								title="Copy humidity"
-								onClick={() => handleCopyValue(`${environment.humidityPct}%`)}
-								role="button"
-								tabIndex={0}
-								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(`${environment.humidityPct}%`); } }}
-							>
-								<div className="miniTitle">습도</div>
-								<div className="miniValue">{environment.humidityPct}%</div>
-							</div>
-							<div
-								className="miniCard clickable"
-								title="Copy lighting"
-								onClick={() => handleCopyValue(environment.lightingSummary || '')}
-								role="button"
-								tabIndex={0}
-								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.lightingSummary || ''); } }}
-							>
-								<div className="miniTitle">조명</div>
-								<div className="miniValue">{environment.lightingSummary || '-'}</div>
-							</div>
-							<div
-								className="miniCard clickable"
-								title="Copy lighting HSB"
-								onClick={() => handleCopyValue(environment.hsbSummary || '')}
-								role="button"
-								tabIndex={0}
-								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.hsbSummary || ''); } }}
-							>
-								<div className="miniTitle">조명 HSB</div>
-								<div className="miniValue">{environment.hsbSummary || '-'}</div>
-							</div>
-							<div
-								className="miniCard clickable"
-								title="Copy music"
-								onClick={() => handleCopyValue(environment.music)}
-								role="button"
-								tabIndex={0}
-								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.music); } }}
-							>
-								<div className="miniTitle">음악</div>
-								<div className="miniValue">{environment.music}</div>
-							</div>
-							<div
-								className="miniCard clickable"
-								title="Copy emotion HSL"
-								onClick={() => handleCopyValue(emotionHsl)}
-								role="button"
-								tabIndex={0}
-								onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(emotionHsl); } }}
-							>
-								<div className="miniTitle">조명 HSL</div>
-								<div className="miniValue" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-									{emotionHslCss ? <span className="chipDot" style={{ backgroundColor: emotionHslCss }} /> : null}
-									{emotionHsl || '-'}
-								</div>
-							</div>
-						</div>
-					)}
 					{reasonText && (
 						<div className="card" style={{ marginTop: 8 }}>
-							<div className="cardTitle">3) 도출 이유</div>
-							<div className="reasonText">{shortReason(reasonText)}</div>
+							<div className="cardTitle">유사 이유</div>
+							<div className="cardBody">{shortReason(reasonText)}</div>
 						</div>
 					)}
-					{tokenUsage && (
-						<div className="footerNote" style={{ marginTop: 8 }}>
-							Tokens — input: {tokenUsage.prompt_tokens ?? '—'}, output:{' '}
-							{tokenUsage.completion_tokens ?? '—'}, total:{' '}
-							{tokenUsage.total_tokens ?? '—'}
-						</div>
+					{environment && (
+						<>
+							<div className="miniGrid">
+								<div
+									className="miniCard clickable"
+									title="Copy temperature"
+									onClick={() => handleCopyValue(`${environment.tempC}°C`)}
+									role="button"
+									tabIndex={0}
+									onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(`${environment.tempC}°C`); } }}
+								>
+									<div className="miniTitle">온도</div>
+									<div className="miniValue">{environment.tempC}°C</div>
+								</div>
+								<div
+									className="miniCard clickable"
+									title="Copy humidity"
+									onClick={() => handleCopyValue(`${environment.humidityPct}%`)}
+									role="button"
+									tabIndex={0}
+									onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(`${environment.humidityPct}%`); } }}
+								>
+									<div className="miniTitle">습도</div>
+									<div className="miniValue">{environment.humidityPct}%</div>
+								</div>
+								<div
+									className="miniCard clickable"
+									title="Copy lighting"
+									onClick={() => handleCopyValue(environment.lightingSummary || '')}
+									role="button"
+									tabIndex={0}
+									onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.lightingSummary || ''); } }}
+								>
+									<div className="miniTitle">조명</div>
+									<div className="miniValue">{environment.lightingSummary || '-'}</div>
+								</div>
+								<div
+									className="miniCard clickable"
+									title="Copy lighting HSB"
+									onClick={() => handleCopyValue(environment.hsbSummary || '')}
+									role="button"
+									tabIndex={0}
+									onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.hsbSummary || ''); } }}
+								>
+									<div className="miniTitle">조명 HSB</div>
+									<div className="miniValue">{environment.hsbSummary || '-'}</div>
+								</div>
+								<div
+									className="miniCard clickable"
+									title="Copy music"
+									onClick={() => handleCopyValue(environment.music)}
+									role="button"
+									tabIndex={0}
+									onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyValue(environment.music); } }}
+								>
+									<div className="miniTitle">음악</div>
+									<div className="miniValue">{environment.music}</div>
+								</div>
+							</div>
+
+							{emotionHsl && (
+								<div className="card clickable" style={{ marginTop: 8 }} onClick={() => handleCopyValue(emotionHsl)}>
+									<div className="cardTitle">조명 HSL (감정 보정)</div>
+									<div className="cardBody" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+										<span className="chipDot" style={{ background: emotionHslCss }} />
+										<span className="footerNote">{emotionHsl}</span>
+									</div>
+								</div>
+							)}
+						</>
 					)}
+
+					<div className="card" style={{ marginTop: 8 }}>
+						<div className="cardTitle">Raw JSON</div>
+						<pre className="codeBlock">{outputText}</pre>
+					</div>
 				</section>
 			</form>
-
-			{(copyMessage || statusMessage) && (
-				<div
-					className="footerNote"
-					style={{ marginTop: 12, color: '#22c55e' }}
-				>
-					{copyMessage || statusMessage}
-				</div>
-			)}
 		</div>
 	);
 }
@@ -445,20 +403,11 @@ async function safeJson(response) {
 	}
 }
 
-function deriveLabel(text) {
-	const t = String(text || '').trim();
-	if (!t) return '';
-	// take first line or up to 60 chars
-	const firstLine = t.split(/\r?\n/)[0];
-	return firstLine.length > 60 ? firstLine.slice(0, 57) + '…' : firstLine;
-}
-
 async function copyToClipboard(text) {
 	if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
 		await navigator.clipboard.writeText(text);
 		return;
 	}
-	// Fallback for older browsers
 	const el = document.createElement('textarea');
 	el.value = text;
 	document.body.appendChild(el);
@@ -506,7 +455,6 @@ function summarizeLighting(lighting, lightingColorHex) {
 				const br = typeof lighting.brightness === 'number' ? lighting.brightness : null;
 				const kPart = typeof k === 'number' ? `TEMP ${Math.round(k)}K` : 'TEMP';
 				const main = br !== null ? `${kPart}; brightness ${Math.round(br)}%` : kPart;
-				// If server provided RGB alongside TEMP, append it
 				if ([lighting.r, lighting.g, lighting.b].every((v) => typeof v === 'number')) {
 					return `${main} | RGB ${Math.round(lighting.r)}, ${Math.round(lighting.g)}, ${Math.round(lighting.b)}`;
 				}
@@ -537,128 +485,6 @@ function formatHSB(hsb) {
 	}
 }
 
-function hexToRgbSimple(hex) {
-	if (!hex) return null;
-	let s = String(hex).trim();
-	if (s.startsWith('#')) s = s.slice(1);
-	if (s.length === 3) s = s.split('').map((c) => c + c).join('');
-	if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
-	const num = parseInt(s, 16);
-	return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
-}
-
-function rgbToHsvSimple(r, g, b) {
-	r /= 255; g /= 255; b /= 255;
-	const max = Math.max(r, g, b), min = Math.min(r, g, b);
-	const d = max - min;
-	let h = 0;
-	if (d !== 0) {
-		switch (max) {
-			case r: h = ((g - b) / d + (g < b ? 6 : 0)); break;
-			case g: h = (b - r) / d + 2; break;
-			case b: h = (r - g) / d + 4; break;
-		}
-		h *= 60;
-	}
-	const s = max === 0 ? 0 : d / max;
-	const v = max;
-	return { h, s, v };
-}
-
-function rgbToHslSimple(r, g, b) {
-	r /= 255; g /= 255; b /= 255;
-	const max = Math.max(r, g, b), min = Math.min(r, g, b);
-	let h = 0, s = 0;
-	const l = (max + min) / 2;
-	if (max !== min) {
-		const d = max - min;
-		s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-		switch (max) {
-			case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-			case g: h = (b - r) / d + 2; break;
-			case b: h = (r - g) / d + 4; break;
-		}
-		h *= 60;
-	}
-	return { h, s, l };
-}
-
-function emotionQuadrant(emotion) {
-	const e = String(emotion || '').trim();
-	if (!e) return 'neutral';
-	const posActive = ['놀라움', '흥분', '설렘', '활력', '흥미', '감격', '기쁨', '기대', '몰입', '집중', '회복', '자각', '도취', '영감', '호기심', '상쾌함', '기대감', '산뜻함', '뿌듯함', '기력회복', '청량', '명료', '맑음', '경쾌', '발돋움', '포커스', '자기확신'];
-	if (posActive.includes(e)) return 'positive';
-	const posPassive = ['고독', '만족', '느긋', '평온', '편안', '애틋함', '향수', '아득함', '해갈감', '충만함', '위안', '고요함', '침착함', '균형감', '온화함', '차분함', '무심함', '감상', '진정', '여유', '꿈결', '몽환', '미온', '관조', '평정심', '포용', '충족감', '해소', '편유', '조용함', '온기', '담담', '완화', '설원감', '은은함', '잔잔함'];
-	if (posPassive.includes(e)) return 'positive';
-	const negActive = ['충격', '당혹', '분노', '짜증', '경계', '긴장', '갈증'];
-	if (negActive.includes(e)) return 'negative';
-	const negPassive = ['번아웃', '피로', '실망', '후회', '무력', '공허', '심심함', '수줍음', '체념', '서늘함', '흐릿함', '음울', '회피', '무기력', '흐트러짐', '무심함 ', '희미함', '가라앉음', '소진', '억눌림', '허무', '회한', '두려움', '고독', '향수'];
-	if (negPassive.includes(e)) return 'negative';
-	return 'neutral';
-}
-
-function computeEmotionHsl(hex, emotion) {
-	try {
-		const rgb = hexToRgbSimple(hex);
-		if (!rgb) return { text: '', css: '' };
-		const q = emotionQuadrant(emotion);
-		let { h, s, l } = rgbToHslSimple(rgb.r, rgb.g, rgb.b);
-		if (q === 'negative') {
-			h = (h + 180) % 360; // complementary for negative emotions
-		}
-		// Keep S/L from the emotion palette as-is (only rotate Hue for negative),
-		// so lighting stays in the same tone family as the provided HEX palette.
-		const sPct = Math.round(s * 100);
-		const lPct = Math.round(l * 100);
-		const css = `hsl(${Math.round(h)}, ${sPct}%, ${lPct}%)`;
-		return { text: `H ${Math.round(h)}, S ${sPct}%, L ${lPct}%`, css };
-	} catch {
-		return { text: '', css: '' };
-	}
-}
-function deriveHSBFromLighting(lighting, lightingColorHex) {
-	try {
-		// Prefer explicit RGB values
-		if (lighting && lighting.mode === 'rgb') {
-			const { r, g, b, brightness } = lighting;
-			if ([r, g, b].every((v) => typeof v === 'number')) {
-				const hsv = rgbToHsvSimple(r, g, b);
-				return {
-					hue: Math.round((hsv.h / 360) * 65535),
-					saturation: Math.round(hsv.s * 254),
-					brightness254: typeof brightness === 'number'
-						? Math.round(Math.max(0, Math.min(100, brightness)) * 2.54)
-						: Math.round(hsv.v * 254)
-				};
-			}
-		}
-		// Fallback to HEX
-		if (lightingColorHex) {
-			const rgb = hexToRgbSimple(lightingColorHex);
-			if (rgb) {
-				const hsv = rgbToHsvSimple(rgb.r, rgb.g, rgb.b);
-				return {
-					hue: Math.round((hsv.h / 360) * 65535),
-					saturation: Math.round(hsv.s * 254),
-					brightness254: Math.round(hsv.v * 254)
-				};
-			}
-		}
-		// TEMP mode → treat as white: sat 0, hue arbitrary 0
-		if (lighting && lighting.mode === 'temp') {
-			const briPct = typeof lighting.brightness === 'number' ? lighting.brightness : 50;
-			return {
-				hue: 0,
-				saturation: 0,
-				brightness254: Math.round(Math.max(0, Math.min(100, briPct)) * 2.54)
-			};
-		}
-		return null;
-	} catch {
-		return null;
-	}
-}
-
 function coerceLightingFromEnv(env) {
 	if (!env || typeof env !== 'object') return null;
 	const mode = typeof env.lightingMode === 'string' ? env.lightingMode.toLowerCase() : '';
@@ -676,28 +502,12 @@ function coerceLightingFromEnv(env) {
 			mode: 'temp',
 			kelvin: typeof env.lightingColorTemp === 'number' ? env.lightingColorTemp : null,
 			brightness: typeof env.brightnessLevel === 'number' ? env.brightnessLevel : null,
-			// also carry RGB if available (server now fills it even in TEMP mode)
 			r: typeof env.lightingR === 'number' ? env.lightingR : null,
 			g: typeof env.lightingG === 'number' ? env.lightingG : null,
 			b: typeof env.lightingB === 'number' ? env.lightingB : null
 		};
 	}
 	return null;
-}
-
-function normalizeToFive(arr) {
-	const base = [
-		{ id: 'slot1', text: '' },
-		{ id: 'slot2', text: '' },
-		{ id: 'slot3', text: '' },
-		{ id: 'slot4', text: '' },
-		{ id: 'slot5', text: '' }
-	];
-	for (let i = 0; i < Math.min(arr.length, 5); i++) {
-		base[i].text = arr[i]?.text || '';
-	}
-	if (!base[0].text) base[0].text = 'You are a helpful assistant.';
-	return base;
 }
 
 function extractHexFromText(text) {
@@ -795,7 +605,6 @@ function extractEnvFromText(text) {
 			typeof obj.lighting_mode === 'string'
 				? obj.lighting_mode.toLowerCase()
 				: null;
-		// Parse channel values regardless of mode so we can show RGB alongside TEMP
 		let lightingR = toInt(obj.lighting_r);
 		let lightingG = toInt(obj.lighting_g);
 		let lightingB = toInt(obj.lighting_b);
@@ -803,11 +612,9 @@ function extractEnvFromText(text) {
 			toNumber(obj.lighting_color_temp) ??
 			toNumber(obj.lighting_kelvin) ??
 			null;
-		// HSB style fields
 		const lightingHue = toInt(obj.lighting_hue);
 		const lightingSaturation254 = toInt(obj.lighting_saturation);
 		const lightingBrightness254 = toInt(obj.lighting_brightness_254);
-		// Parse "lighting_rgb": "r, g, b" if provided and per-channel values are missing
 		if (lightingR === null || lightingG === null || lightingB === null) {
 			if (typeof obj.lighting_rgb === 'string') {
 				const parts = obj.lighting_rgb.split(',').map((x) => toInt(x));
